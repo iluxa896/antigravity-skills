@@ -1,0 +1,53 @@
+# Makefile.switch - Nintendo Switch devkitA64 Makefile for ported games
+# Usage: make -f Makefile.switch
+
+ifeq ($(strip $(DEVKITPRO)),)
+$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=/opt/devkitpro")
+endif
+
+include $(DEVKITPRO)/libnx/switch_rules
+
+TARGET      := switch_game
+BUILD       := build
+SOURCES     := .
+INCLUDES    := include
+ROMFS_DIR   := romfs
+
+ARCH        := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -ftls-model=local-exec
+CFLAGS      := -g -Wall -O2 -ffunction-sections -fdata-sections $(ARCH) -D__SWITCH__=1
+CFLAGS      += $(INCLUDE) -I$(LIBNX)/include -I$(PORTLIBS)/include -I.
+CXXFLAGS    := $(CFLAGS) -fno-rtti -fno-exceptions
+
+LIBDIRS     := $(PORTLIBS) $(LIBNX)
+LIBPATHS    := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
+LIBS        := -lSDL2 -lSDL2_image -lSDL2_mixer -lnx -lm
+LDFLAGS     := -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,--gc-sections
+
+APP_TITLE   := Ported Switch Game
+APP_AUTHOR  := Homebrew Developer
+APP_VERSION := 1.0.0
+
+C_SRCS      := $(wildcard *.c) $(wildcard src/*.c)
+CPP_SRCS    := $(wildcard *.cpp) $(wildcard src/*.cpp)
+
+.PHONY: all clean host pc
+
+all: $(TARGET).nro
+
+$(TARGET).elf: $(C_SRCS) $(CPP_SRCS)
+	@mkdir -p $(BUILD)
+	aarch64-none-elf-gcc $(CFLAGS) $(LDFLAGS) $(LIBPATHS) $^ $(LIBS) -o $@
+
+$(TARGET).nro: $(TARGET).elf
+	@ROMFS_OPT=""; if [ -d "$(ROMFS_DIR)" ]; then ROMFS_OPT="--romfsdir=$(ROMFS_DIR)"; fi; \
+	ICON_OPT=""; if [ -f "icon.jpg" ]; then ICON_OPT="--icon=icon.jpg"; elif [ -f "icon.png" ]; then ICON_OPT="--icon=icon.png"; fi; \
+	elf2nro $< $@ --name="$(APP_TITLE)" --author="$(APP_AUTHOR)" --version="$(APP_VERSION)" $$ROMFS_OPT $$ICON_OPT
+	@echo "Build complete: $@"
+
+host pc:
+	@echo "Compiling for desktop development..."
+	gcc -O2 -Wall switch-game-main.c -lSDL2 -o $(TARGET)_desktop
+	@echo "Desktop build complete: ./$(TARGET)_desktop"
+
+clean:
+	@rm -rf $(BUILD) $(TARGET).elf $(TARGET).nro $(TARGET)_desktop
