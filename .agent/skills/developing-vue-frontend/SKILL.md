@@ -2,21 +2,22 @@
 name: developing-vue-frontend
 description: >-
   Assists with modern Vue 3 frontend development, creating high-converting selling designs,
-  modern UI/UX aesthetics, and ultra-secure enterprise-grade Vue applications. Enforces Composition
-  API, TypeScript, Pinia state management, DOM XSS prevention, Vue Router guards, performance
-  optimization, and accessibility. Use when building, styling, or refactoring Vue components,
-  designing high-converting landing pages/dashboards, or auditing Vue frontend code.
+  cross-platform UI/UX (Android, iOS, Mac, Windows), and ultra-secure enterprise Vue applications.
+  Enforces Composition API, strict TypeScript, Pinia state management, DOM XSS defense,
+  viewport resilience (100dvh, safe areas, scroll locking), and accessibility. Use when building,
+  styling, or refactoring Vue components, designing dashboards, or auditing frontend code.
 ---
 
-# Developing High-Converting & Secure Vue 3 Applications (Master Skill)
+# Developing High-Converting, Secure & Cross-Platform Vue 3 Applications (Master Skill)
 
 ## When to use this skill
-- Building or refactoring Vue 3 components, views, layouts, or composables (`<script setup lang="ts">`).
-- Designing high-converting landing pages, SaaS dashboards, pricing tables, checkout steps, or interactive interfaces.
-- Hardening Vue 3 frontend code against DOM XSS, prototype pollution, state leaks, and unauthorized route access.
-- Implementing state management with Pinia setup stores, custom composables, or router navigation guards.
-- Optimizing Vue rendering performance, lazy loading, bundle size, and WCAG 2.1 AA accessibility.
-- Running the Vue component audit tool (`scripts/vue-audit-tool.mjs`).
+
+- Building or refactoring Vue 3 components, views, or layouts using `<script setup lang="ts">`.
+- Writing type-safe composables (`usePlatformAdaptation.ts`, `useSafeFormValidation.ts`, `useBodyScrollLock.ts`) or Pinia setup stores.
+- Engineering cross-platform resilience across **iOS / iPhone**, **Android**, **macOS**, and **Windows**.
+- Designing high-converting landing pages, SaaS dashboards, pricing cards, and modal dialogs.
+- Hardening frontend code against DOM XSS, prototype pollution, token exfiltration, and open redirects.
+- Auditing Vue components via the automated CLI scanner (`scripts/vue-audit-tool.mjs`).
 
 ---
 
@@ -24,88 +25,79 @@ description: >-
 
 | Freedom Level | Area | Application & Constraints |
 | :--- | :--- | :--- |
-| **High Freedom** | Visual UI/UX & Layout Aesthetics | Selecting color palettes, typography scales, glassmorphic overlays, ambient glow accents, and micro-interaction curves. |
-| **Medium Freedom** | Component Structure & State Architecture | Structuring Pinia stores, designing composable APIs, defining Vue Router transitions, and chunking route lazy loads. |
-| **Low Freedom** | Security, Typings & Accessibility | Mandatory `DOMPurify.sanitize()` on all `v-html`, typed `defineProps<{...}>()`, navigation auth guards, WAI-ARIA form bindings, zero sensitive tokens in `localStorage`. |
+| **High Freedom** | Visual UI/UX & Layout Aesthetics | Selecting color palettes, typography hierarchies, ambient glow accents, glassmorphic overlays, and micro-interaction easing curves. |
+| **Medium Freedom** | Component Structure & State Architecture | Structuring Pinia stores, designing composable contracts, configuring dynamic chunking, and defining route transition animations. |
+| **Low Freedom** | Security, Typings & Cross-Platform Quirks | Mandatory TypeScript (`lang="ts"`), `DOMPurify.sanitize()` on all `v-html`, dynamic viewport (`100dvh`), iOS input font-size >= 16px, `touch-action: manipulation`, zero sensitive tokens in `localStorage`. |
 
 ---
 
 ## 2. Core Engineering Pillars
 
-### A. High-Converting & Non-Standard Selling Design (UI/UX)
-- **Visual Distinction & Wow Factor**:
-  - Avoid flat, generic templates. Use layered depth: subtle multi-tier box shadows, dynamic ambient glow effects (`box-shadow: 0 0 40px rgba(99, 102, 241, 0.15)`), and glassmorphic overlays (`backdrop-filter: blur(12px)`).
-  - Use custom curated color palettes: Dark mode slate/zinc (`#090d16`, `#0f172a`), accented with electric violet, emerald, or warm amber highlights.
-  - Implement fluid micro-interactions: Smooth hover lifts (`transform: translateY(-2px)`), button click ripples/press scale (`active:scale-[0.98]`), and interactive state badges.
-- **Conversion-Optimized Hierarchy**:
-  - **Focal Points**: High-contrast, magnetic Primary Call-to-Actions (CTAs) with gradient accents, pulsating badges ("Most Popular", "Live Demo"), and clear value propositions above the fold.
-  - **Social Proof & Urgency**: Dynamic rating badges, customer proof counters, and interactive feature comparison matrices.
-  - **Frictionless Form UX**: Floating labels, inline real-time validation, readable error microcopy, and auto-focus states.
+### A. Clean Architecture & Strict TypeScript Contracts
+- **Strict Composition API**: Standardize exclusively on Single File Components (SFC) with `<script setup lang="ts">`. Untyped JS modules are forbidden.
+- **Typed Prop & Emit Contracts**: Use `defineProps<{...}>()` and `defineEmits<{...}>()`. Never use loose untyped prop arrays.
+- **Domain Composables**: Extract all stateful business workflows into dedicated composables returning readonly state, typed handlers, and deterministic lifecycle disposal (`onScopeDispose`).
+- **Encapsulated Pinia Stores**: Use Setup Store syntax `defineStore('id', () => { ... })` with explicit TypeScript DTO interfaces. Keep short-lived access tokens strictly in RAM (in-memory) with silent rotation via HttpOnly cookies.
 
-### B. Comprehensive Frontend Security
-- **DOM XSS Prevention**:
-  - **Never** bind untrusted user input directly to `v-html`.
-  - Always sanitize rich text content using `DOMPurify.sanitize()` before passing to `v-html`.
-  - Prefer Vue template interpolation `{{ userContent }}` which automatically escapes HTML entities.
-- **Safe Dynamic Content & Attributes**:
-  - Sanitize URLs bound to `href` and `src` attributes against `javascript:` and `data:` schemes.
-  - Validate and sanitize external redirect parameters in `vue-router` to prevent Open Redirect attacks.
-- **Secure State & Token Management**:
-  - Never store sensitive JWT access tokens in unencrypted `localStorage` or `sessionStorage` (vulnerable to XSS extraction).
-  - Prefer HTTP-only, `SameSite=Strict`, Secure cookies handled by the backend, or in-memory Pinia storage synchronized with silent refresh rotation.
-- **Content Security Policy (CSP)**:
-  - Do not use runtime template compilation with `eval()` or `new Function()`.
-  - Use strict build-time pre-compiled templates with Vite (`@vitejs/plugin-vue`).
+### B. Deep Cross-Platform Engineering (iOS, Android, Mac, Windows)
 
-### C. Modern Vue 3 Composition API & TypeScript Standards
-- **Component Architecture**:
-  - Standardize on Single File Components (SFC) with `<script setup lang="ts">`.
-  - Use generic and typed `defineProps<{ ... }>()` and `defineEmits<{ ... }>()`.
-  - Extract reusable stateful logic into type-safe composables (`useSafeFormValidation()`, `useAuth()`).
-- **State Management (Pinia)**:
-  - Use Setup Store syntax `defineStore('id', () => { ... })` for cleaner TypeScript inference and composable integration.
-  - Keep stores single-responsibility; isolate domain state from transient UI state.
-- **Performance & Code Splitting**:
-  - Implement async route-level code splitting using dynamic imports: `component: () => import('@/views/DashboardView.vue')`.
-  - Use `v-memo` or `<KeepAlive>` for expensive dynamic component re-renders.
+| Platform | Core Challenge & Bug Risk | Enterprise Solution & Architecture |
+| :--- | :--- | :--- |
+| **iPhone / iOS** (WebKit) | • Expanding Safari toolbars break `100vh`<br>• Notches & home indicators overlap buttons<br>• Input focus triggers disruptive auto-zoom<br>• Momentum scroll freezes on `overflow: hidden`<br>• Grey tap overlay boxes | • Use `100dvh` (with `100vh` fallback)<br>• Apply `env(safe-area-inset-*)` & `viewport-fit=cover`<br>• Enforce input `font-size: 16px` (`text-base`)<br>• Use `useBodyScrollLock` (`position: fixed` offset)<br>• Add `-webkit-tap-highlight-color: transparent` |
+| **Android** (Blink / Chrome) | • 300ms double-tap gesture latency<br>• Hardware/gesture back exits app instead of closing modal<br>• Unwanted pull-to-refresh on dialog scroll<br>• Backdrop flex-sibling render calculation flash (16–50ms) | • Apply `touch-action: manipulation`<br>• Use `useAndroidBackModalSync` via `popstate`<br>• Apply `overscroll-behavior-y: contain`<br>• Decouple backdrop & dialog into distinct fixed layers |
+| **macOS** (Safari / Chrome) | • Blurry font rendering on Retina<br>• Power-user shortcut confusion (Cmd vs Ctrl)<br>• Two-finger swipe triggers browser history navigation | • Add `-webkit-font-smoothing: antialiased`<br>• Bind `event.metaKey` (⌘) vs `event.ctrlKey`<br>• Isolate slider touch actions (`touch-action: pan-y`) |
+| **Windows** (Edge / Chrome) | • Physical scrollbars cause layout shifts (CLS)<br>• Ugly default system scrollbars<br>• Unreadable UI in High Contrast Mode<br>• Touch-screen laptops trigger sticky hover bugs | • Enforce `scrollbar-gutter: stable` on root wrappers<br>• Custom sleek styling (`scrollbar-width: thin`)<br>• Support `@media (forced-colors: active)`<br>• Isolate hover via `@media (hover: hover) and (pointer: fine)` |
+
+### C. Security-by-Design & Robustness
+- **DOM XSS Defense**: Never pass unescaped user strings to `v-html`. Always use `DOMPurify.sanitize()`. Prefer text interpolation `{{ content }}`.
+- **Protocol Whitelisting**: Sanitize dynamic `:href` and `:src` bindings against `javascript:` and `data:` schemes.
+- **Defensive Number Coercion**: Never invoke `.toFixed()` on raw API values without explicit numeric casting (`Number(val ?? 0).toFixed(2)`).
+- **Division-by-Zero Defense**: Guard all percentages and ratios (`den <= 0 ? 0 : (num / den) * 100`).
+
+### D. High-Converting UI/UX & Micro-Interactions
+- **Magnetic Above-The-Fold**: Strong H1 headline, quantified social proof, and primary CTA within the initial viewport.
+- **Layered Visual Depth**: Translucent surfaces (`backdrop-filter: blur(16px)`), subtle borders (`1px solid rgba(255,255,255,0.08)`), and ambient colored drop-shadows.
+- **Touch vs Hover Separation**: Never rely on hover states for critical actions on mobile. Use distinct `:active` scaling for touch screens.
 
 ---
 
-## 3. Workflow: Plan -> Design -> Secure -> Validate
+## 3. Step-by-Step Workflow (Plan -> Contract -> Implement -> Audit)
 
 ```markdown
-- [ ] 1. Architecture & Layout Plan
-      - Define component hierarchy and typed contracts (props, emits, DTO models).
-      - Select design tokens (color palette, typography scale, responsive breakpoints).
-- [ ] 2. High-Impact UI/UX Implementation
-      - Implement semantic markup with accessible ARIA tags.
-      - Add glassmorphism, micro-animations, and high-conversion CTA elements.
-- [ ] 3. Security Hardening
-      - Audit all v-html, dynamic bindings, URLs, and router parameters.
-      - Ensure sanitized inputs and safe token/session storage in Pinia.
-- [ ] 4. Automated Verification & Testing
-      - Run Vue audit tool: node .agent/skills/developing-vue-frontend/scripts/vue-audit-tool.mjs
-      - Check TypeScript compilation (vue-tsc --noEmit or tsc).
-      - Verify responsive layouts on Mobile (375px), Tablet (768px), and Desktop (1440px+).
+- [ ] 1. Architecture & Typed Contracts
+      - Define TypeScript interfaces for props, emits, and domain DTO models.
+      - Ensure components use <script setup lang="ts"> and stores use typed Pinia.
+- [ ] 2. Cross-Platform Layout & Styling
+      - Apply 100dvh, safe area insets (env(safe-area-inset-*)), and scrollbar-gutter: stable.
+      - Enforce font-size >= 16px on inputs and touch-action: manipulation on buttons.
+      - Isolate hover lifts behind @media (hover: hover) and (pointer: fine).
+- [ ] 3. Security Hardening & Zero-Trust Checks
+      - Verify all v-html uses DOMPurify; sanitize dynamic href links.
+      - Check numeric conversions and divide-by-zero guards.
+- [ ] 4. Automated Audit Verification
+      - Run Vue audit tool: node .agent/skills/developing-vue-frontend/scripts/vue-audit-tool.mjs --path src/ --strict
 ```
 
 ---
 
 ## 4. Automated Vue Quality Verification
 
-Run the built-in Vue auditor to inspect components for DOM XSS, insecure URLs, and accessibility:
+Run the built-in auditor across components to verify security, TypeScript, accessibility, and cross-platform safety:
 
 ```bash
-node .agent/skills/developing-vue-frontend/scripts/vue-audit-tool.mjs --path src/
+node .agent/skills/developing-vue-frontend/scripts/vue-audit-tool.mjs --path src/ --strict
 ```
 
 ---
 
 ## 5. Supporting Resources & Examples
 
-- **Vue Audit Tool Script**: [vue-audit-tool.mjs](./scripts/vue-audit-tool.mjs) - Node.js CLI script auditing Vue SFCs for XSS, insecure links, and missing accessibility attributes.
-- **High-Converting Selling Card**: [high-converting-selling-card.vue](./examples/high-converting-selling-card.vue) - Production-ready Vue 3 SFC with glassmorphism, animated CTA, and typed TypeScript props.
-- **Safe Form Validation Composable**: [useSafeFormValidation.ts](./examples/useSafeFormValidation.ts) - Type-safe Vue 3 composable with real-time validation, XSS sanitization, and ARIA state bindings.
-- **Secure Pinia Auth Store**: [secure-auth-store.ts](./examples/secure-auth-store.ts) - In-memory JWT access token management, silent refresh, and XSS-safe state isolation.
-- **High-Converting UI Reference**: [high-converting-ui-patterns.md](./references/high-converting-ui-patterns.md) - Design tokens, conversion psychology, micro-interaction timing, and WCAG AA guidelines.
-- **Vue Security & UX Checklist**: [vue-security-ux-checklist.md](./resources/vue-security-ux-checklist.md) - Actionable checklist for DOM XSS, routing guards, and CRO UI patterns.
+- **Platform Adaptation Composable**: [usePlatformAdaptation.ts](./examples/usePlatformAdaptation.ts) - TypeScript composable for OS detection, visual viewport tracking, shortcut formatting (⌘ vs Ctrl), and Android back-button modal sync.
+- **Bulletproof Modal Component**: [bulletproof-modal.vue](./examples/bulletproof-modal.vue) - Production modal with `100dvh`, safe-area insets, Android back sync, zero-deadlock WebKit scroll locking, and GPU compositing.
+- **High-Converting Selling Card**: [high-converting-selling-card.vue](./examples/high-converting-selling-card.vue) - Conversion-optimized pricing card with hover isolation, touch-active physics, and high contrast support.
+- **Safe Scroll Locking Composable**: [useBodyScrollLock.ts](./examples/useBodyScrollLock.ts) - Zero-deadlock WebKit momentum scroll locking with Windows `scrollbar-gutter` awareness.
+- **Safe Form Validation Composable**: [useSafeFormValidation.ts](./examples/useSafeFormValidation.ts) - Type-safe form validation with XSS sanitization and WAI-ARIA helpers.
+- **Secure Pinia Auth Store**: [secure-auth-store.ts](./examples/secure-auth-store.ts) - In-memory access token storage, HttpOnly silent refresh, and XSS isolation.
+- **Cross-Platform UI Guide**: [high-converting-ui-patterns.md](./references/high-converting-ui-patterns.md) - Deep architectural guide on iOS, Android, Mac, and Windows viewport quirks, tokens, and motion curves.
+- **Vue Security & Cross-Platform Checklist**: [vue-security-ux-checklist.md](./resources/vue-security-ux-checklist.md) - Actionable audit checklist covering DOM XSS, navigation guards, and complete OS device matrices.
+- **Vue Audit CLI Script**: [vue-audit-tool.mjs](./scripts/vue-audit-tool.mjs) - Node.js CLI auditor inspecting SFCs for XSS, raw 100vh, input zoom bugs, and TypeScript usage.

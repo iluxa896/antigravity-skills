@@ -109,7 +109,7 @@ node .agent/skills/auditing-web-security/scripts/security-audit-scanner.mjs --pa
 
 - **Security Scanner Tool**: [security-audit-scanner.mjs](./scripts/security-audit-scanner.mjs) - Node.js CLI script scanning codebases for SQLi, XSS, RCE, SSRF, and storage leaks.
 - **Hardened Nginx Server Config**: [nginx-security-hardened.conf](./examples/nginx-security-hardened.conf) - Production Nginx configuration with complete CSP, HSTS, rate limiting, and TLS 1.3.
-- **Frontend Vulnerability Matrix**: [vulnerable-vs-secure-frontend.js](./examples/vulnerable-vs-secure-frontend.js) - Comparison of unsafe vs secure JS/DOM patterns.
+- **Frontend Vulnerability Matrix**: [vulnerable-vs-secure-frontend.ts](./examples/vulnerable-vs-secure-frontend.ts) - TypeScript reference of unsafe vs secure DOM, storage, and CSRF patterns.
 - **Backend Vulnerability Matrix**: [vulnerable-vs-secure-backend.php](./examples/vulnerable-vs-secure-backend.php) - Comparison of raw queries, command execution, and SSRF vs secure PHP code.
 - **OWASP Top 10 Deep Dive Guide**: [owasp-top10-deep-dive.md](./references/owasp-top10-deep-dive.md) - Deep architectural guide on SSRF DNS rebinding, BOLA mitigation, and blind SQLi.
 - **Audit Checklist & Headers**: [owasp-audit-checklist.md](./resources/owasp-audit-checklist.md) - Actionable audit matrix and security header definitions.

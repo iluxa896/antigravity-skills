@@ -159,10 +159,12 @@ const handleActionClick = () => {
   overflow: hidden;
 }
 
-.pricing-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.25);
+@media (hover: hover) and (pointer: fine) {
+  .pricing-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.25);
+  }
 }
 
 .pricing-card--popular {
@@ -293,17 +295,9 @@ const handleActionClick = () => {
   background: #334155;
   border: 1px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.cta-button:hover:not(:disabled) {
-  background: #475569;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.4);
-}
-
-.cta-button:active:not(:disabled) {
-  transform: scale(0.98);
 }
 
 .cta-button--gradient {
@@ -312,9 +306,39 @@ const handleActionClick = () => {
   box-shadow: 0 8px 24px -6px rgba(99, 102, 241, 0.5);
 }
 
-.cta-button--gradient:hover:not(:disabled) {
-  box-shadow: 0 12px 30px -6px rgba(219, 39, 119, 0.6);
-  filter: brightness(1.1);
+/* Isolate hover to mouse/pointer devices to avoid sticky hover states on touch */
+@media (hover: hover) and (pointer: fine) {
+  .cta-button:hover:not(:disabled) {
+    background: #475569;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.4);
+  }
+
+  .cta-button:hover .arrow-icon {
+    transform: translateX(4px);
+  }
+
+  .cta-button--gradient:hover:not(:disabled) {
+    box-shadow: 0 12px 30px -6px rgba(219, 39, 119, 0.6);
+    filter: brightness(1.1);
+  }
+}
+
+/* Touch screen feedback (iOS/Android) */
+@media (pointer: coarse) {
+  .cta-button:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+
+/* Windows High Contrast Mode */
+@media (forced-colors: active) {
+  .pricing-card {
+    border: 2px solid CanvasText;
+  }
+  .cta-button {
+    border: 2px solid ButtonText;
+  }
 }
 
 .button-content {
@@ -327,10 +351,6 @@ const handleActionClick = () => {
   width: 1.125rem;
   height: 1.125rem;
   transition: transform 0.2s ease;
-}
-
-.cta-button:hover .arrow-icon {
-  transform: translateX(4px);
 }
 
 .guarantee-text {

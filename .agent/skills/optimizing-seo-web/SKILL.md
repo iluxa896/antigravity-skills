@@ -100,6 +100,6 @@ node .agent/skills/optimizing-seo-web/scripts/seo-audit-linter.mjs --path public
 
 - **Technical SEO Linter Script**: [seo-audit-linter.mjs](./scripts/seo-audit-linter.mjs) - Node.js CLI script inspecting HTML templates for headings, alt tags, canonicals, and meta descriptions.
 - **Typesafe JSON-LD Schema Generator**: [json-ld-schemas.ts](./examples/json-ld-schemas.ts) - TypeScript helpers for building valid Schema.org JSON-LD structures.
-- **Robots & Sitemap Generator Script**: [robots-and-sitemap-generator.js](./examples/robots-and-sitemap-generator.js) - Automated script generating compliant `robots.txt` and `sitemap.xml`.
+- **Robots & Sitemap Generator Script**: [robots-and-sitemap-generator.js](./examples/robots-and-sitemap-generator.js) - Universal, zero-dependency Node.js script generating compliant `robots.txt` and `sitemap.xml`.
 - **Technical SEO Architecture Guide**: [technical-seo-architecture.md](./references/technical-seo-architecture.md) - Deep guide covering Googlebot rendering pipelines, crawl budget optimization, and Core Web Vitals.
 - **Technical SEO Checklist & Metrics**: [technical-seo-checklist.md](./resources/technical-seo-checklist.md) - Comprehensive checklist covering CWV thresholds, HTTP status codes, and `hreflang` tags.

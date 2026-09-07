@@ -12,10 +12,10 @@ description: >-
 
 ## When to use this skill
 - Writing, refactoring, or optimizing PHP 8.1+ backend code.
-- Designing application layers (Controllers, Form Requests, DTOs, Services, Actions, Repositories).
+- Designing clean application layers (Thin Controllers, Form Requests, DTOs, Domain Services, Actions, Repositories).
 - Configuring and querying database layers with Eloquent, Doctrine ORM, or Phalcon MVC Models.
 - Writing or securing template views using Blade, Twig, or Volt.
-- Resolving N+1 query issues, implementing database transactions, or enforcing parameter binding.
+- Resolving N+1 query bottlenecks, enforcing parameter binding, or wrapping mutations in atomic transactions.
 - Running syntax validation (`scripts/php-lint.php`), static analysis (PHPStan/Psalm), or test suites (PHPUnit/Pest).
 
 ---
@@ -24,97 +24,101 @@ description: >-
 
 | Freedom Level | Area | Application & Constraints |
 | :--- | :--- | :--- |
-| **High Freedom** | Architecture & Domain Boundaries | Domain boundary design, repository patterns vs active record, choosing between Action classes or Domain Services, event-driven messaging. |
-| **Medium Freedom** | DTO Contracts & Validation Rules | Structuring Form Requests, DTO property naming, API Resource payload shaping, caching durations. |
-| **Low Freedom** | Security, Type Safety & SQL Binding | Strict parameter binding (zero raw SQL concatenation), explicit native PHP 8 type declarations on all signatures, PSR-12 formatting, no runtime `declare(strict_types=1);` per `project_rules.md`. |
+| **High Freedom** | Domain Architecture & Strategy | Bounded context modeling, Action vs Domain Service selection, event-driven architecture, caching strategies. |
+| **Medium Freedom** | DTO Contracts & Validation Rules | Form Request validation rules, DTO property names, API Resource payload shaping, repository query helpers. |
+| **Low Freedom** | Security, Type Safety & Transactions | Strict parameter binding (zero raw SQL concatenation), atomic DB transactions with rollback, explicit native PHP 8.1+ types, PSR-12, no runtime `declare(strict_types=1);`. |
 
 ---
 
-## 2. PHP Project Architecture & Environment Verification Framework
+## 2. Clean Architecture & Layered Boundaries
 
-Before generating or modifying PHP backend code, verify the project environment and standards:
-
-| Layer / Dimension | Target Standard / Tooling | Inspection Command / Rule |
-| :--- | :--- | :--- |
-| **PHP Runtime** | PHP 8.1 - 8.4+ | `php -v` & `composer.json` (`php` requirement) |
-| **Framework** | Laravel 10/11, Symfony 6/7, Phalcon 5 | Inspect `composer.json` dependencies & framework versions |
-| **Coding Standards** | PSR-12 & PSR-PER | Mandatory explicit native PHP 8+ type declarations for all properties, parameters, and return values |
-| **Strict Types** | No runtime `declare(strict_types=1);` | Adhere strictly to `project_rules.md` |
-| **Database & ORM** | Eloquent, Doctrine, Phalcon PHQL | Parameter binding enforced; zero raw string SQL concatenation |
-| **Validation & Linting** | `php -l` & Static Analysis | Execute syntax check via `scripts/php-lint.php` before finishing |
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Transport Layer   : Thin Controllers / CLI Commands      │
+│    -> Input ingestion, Form Request / DTO mapping           │
+├─────────────────────────────────────────────────────────────┤
+│ 2. Application Layer : Action Classes / Domain Services     │
+│    -> Orchestration, DB transactions, Business validation   │
+├─────────────────────────────────────────────────────────────┤
+│ 3. Domain Layer      : Entities, Backed Enums, Value Objects│
+│    -> Core business invariants, strict native typings       │
+├─────────────────────────────────────────────────────────────┤
+│ 4. Persistence Layer : Eloquent, Doctrine ORM, Phalcon PHQL │
+│    -> Parameter binding, Eager loading (with / JOIN FETCH)  │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## 3. Step-by-Step Development Workflow (Plan-Validate-Execute)
 
 ```markdown
-- [ ] 1. Environment & Package Verification
-  - Run php -v and inspect composer.json to identify installed packages, framework versions, and PHP extensions.
-- [ ] 2. Architecture Design
-  - Keep controllers thin. Delegate payload validation to Form Requests/DTOs and business logic to Action/Service classes.
-- [ ] 3. Type Declarations & Clean Code
-  - Enforce explicit PHP 8+ native type declarations on all functions, methods, and properties.
-- [ ] 4. Security & Query Optimization
-  - Bind all query parameters. Use eager loading (with(), JOIN FETCH) to eliminate N+1 query issues.
-- [ ] 5. Syntax & Test Validation
-  - Execute syntax validation with php scripts/php-lint.php <path>. Run PHPUnit or Pest test suites if available.
+- [ ] 1. Environment & Framework Verification
+      - Run php -v and inspect composer.json (PHP 8.1–8.4+, Laravel 10/11, Symfony 6/7, Phalcon 5).
+- [ ] 2. Clean Architecture Scaffolding
+      - Keep controllers ultra-thin; map inputs to typed DTOs or Form Requests.
+      - Encapsulate domain logic inside single-responsibility Action classes or Domain Services.
+- [ ] 3. Strict Type Declarations & PSR-12
+      - Enforce native PHP 8+ types for all properties, parameters, and returns (no runtime declare(strict_types=1);).
+- [ ] 4. Security & Data Integrity
+      - Bind all SQL query parameters. Wrap multi-step writes in atomic transactions with automatic rollback.
+      - Eager load relations (Post::with('author'), JOIN FETCH) to eliminate N+1 bottlenecks.
+- [ ] 5. Syntax & Regression Verification
+      - Run: php .agent/skills/developing-php-backend/scripts/php-lint.php <target-dir>
 ```
 
 ---
 
 ## 4. Modern PHP 8+ Language Standards (PHP 8.1 – 8.4+)
 
-- **Constructor Property Promotion & Readonly Properties**:
+- **Readonly DTOs with Constructor Promotion**:
   ```php
-  public readonly class UserDto
+  public readonly class CreatePostDto
   {
       public function __construct(
-          public int $id,
-          public string $email,
-          public ?string $name = null,
+          public string $title,
+          public string $content,
+          public int $authorId,
+          public ?string $category = null,
       ) {}
   }
   ```
-- **Enum Types (Backed Enums)**:
+- **Backed Enums with Match Expressions**:
   ```php
   enum PostStatus: string
   {
       case DRAFT = 'draft';
       case PUBLISHED = 'published';
       case ARCHIVED = 'archived';
-  }
-  ```
-- **Match Expressions & Nullsafe Operator**:
-  ```php
-  $badgeColor = match ($post->status) {
-      PostStatus::PUBLISHED => 'green',
-      PostStatus::DRAFT => 'yellow',
-      PostStatus::ARCHIVED => 'gray',
-  };
 
-  $authorName = $post->author?->profile?->displayName ?? 'Guest';
+      public function badgeColor(): string
+      {
+          return match ($this) {
+              self::PUBLISHED => 'green',
+              self::DRAFT => 'yellow',
+              self::ARCHIVED => 'gray',
+          };
+      }
+  }
   ```
 
 ---
 
-## 5. Framework-Specific Guidelines
+## 5. Framework-Specific Clean Implementations
 
 ### A. Laravel (10 / 11)
-- **Thin Controllers**: Delegate payload validation to Form Requests and business logic to dedicated Action classes.
-- **API Serialization**: Use Eloquent API Resources (`JsonResource`) instead of returning raw arrays or model objects.
-- **Database Safety**: Wrap multi-step mutations in `DB::transaction()`. Always eager load relations using `Post::with('author')`.
+- **Thin Controllers**: Ingest typed `StorePostRequest`, delegate to `CreatePostAction`, return `PostResource`.
+- **Transactions & Eager Loading**: Wrap writes in `DB::transaction()`. Load relations via `Post::with('author')`.
 - **See Reference Implementation**: [laravel-controller-eloquent.php](./examples/laravel-controller-eloquent.php)
 
 ### B. Symfony (6 / 7)
-- **Thin Controllers & DTOs**: Map incoming requests to typed DTOs, validating them via PHP 8 Attributes (`#[Assert\NotBlank]`).
-- **Dependency Injection**: Use constructor autowiring. Define service configurations in `config/services.yaml`.
-- **Doctrine ORM**: Prefer Doctrine `QueryBuilder` with explicit parameter binding (`->setParameter('key', $val)`). Fetch joined entities (`JOIN FETCH`) in DQL to avoid N+1 queries.
+- **DTOs & Attribute Validation**: Map payloads to DTOs with PHP 8 attributes (`#[Assert\NotBlank]`).
+- **Doctrine ORM**: Use `QueryBuilder` with explicit parameter binding (`->setParameter('key', $val)`). Fetch joined entities (`JOIN FETCH`) to avoid N+1 queries.
 - **See Reference Implementation**: [symfony-controller-doctrine.php](./examples/symfony-controller-doctrine.php)
 
 ### C. Phalcon (5)
-- **REST API Endpoints**: Explicitly call `$this->view->disable()` and return `$this->response->setJsonContent(...)`.
-- **Request Validation**: Use `Phalcon\Filter\Validation` to sanitize and validate request parameters.
-- **Phalcon Models & PHQL**: Always bind parameters in static `find()` conditions or PHQL queries (`'bind' => ['published' => 'Y']`). Define reusable relationships in model `initialize()` methods.
+- **REST API Endpoints**: Call `$this->view->disable()` and return `$this->response->setJsonContent(...)`.
+- **Request Validation & Bound PHQL**: Use `Phalcon\Filter\Validation` and bind parameters in queries (`'bind' => [...]`).
 - **See Reference Implementation**: [phalcon-controller-model.php](./examples/phalcon-controller-model.php)
 
 ---
@@ -123,7 +127,7 @@ Before generating or modifying PHP backend code, verify the project environment 
 
 Validate syntax recursively across your codebase before committing:
 
-```powershell
+```bash
 php .agent/skills/developing-php-backend/scripts/php-lint.php .agent/skills/developing-php-backend/
 ```
 

@@ -22,3 +22,17 @@
 - [x] Upgrade examples/win32_to_sdl2_shim.h and provide complete examples/switch-game-main.c (zero placeholders)
 - [x] Create automated Node.js CLI tool scripts/switch-port-validator.mjs with --help, banned-API checks, and BSS safety
 - [x] Validate entire repository with validate-skills.mjs
+
+## Phase 16: Enterprise Clean Architecture, Safety, TypeScript & Cross-Platform Refactoring
+- [x] Update `project_rules.md` with TypeScript, cross-platform, and clean architecture standards
+- [x] Refactor `developing-vue-frontend` with strict TypeScript, cross-platform composable (`usePlatformAdaptation.ts`), and OS-specific hardening (iOS, Android, Mac, Windows)
+- [x] Refactor `developing-php-backend` with clean architecture, thin controllers, typed DTOs, and PSR-12 native types
+- [x] Refactor `assuring-software-quality` with test pyramid, destructive testing, and resilient selector contracts
+- [x] Refactor `auditing-web-security` with zero-trust defense, TypeScript migration, and OWASP Top 10 remediation
+- [x] Refactor `configuring-docker-environments` with multi-stage non-root builds and disk bloat prevention
+- [x] Refactor `managing-postgres-mysql` with zero-downtime DDL, lock timeouts, and diagnostic toolkits
+- [x] Refactor `optimizing-seo-web` with typed JSON-LD schemas, TypeScript sitemap generator, and semantic HTML
+- [x] Refactor `creating-agent-skills` meta-skill and upgrade `validate-skills.mjs`
+- [x] Run full workspace test suite (validate-skills, php-lint, vue-audit, security-audit, etc.)
+
+
