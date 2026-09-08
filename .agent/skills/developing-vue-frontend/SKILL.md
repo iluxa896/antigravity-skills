@@ -15,7 +15,7 @@ description: >-
 
 - Building or refactoring Vue 3 components, views, or layouts using `<script setup lang="ts">`.
 - Creating interactive UI primitives (dialogs, popovers, dropdowns, tooltips, selects) — **must use Radix Vue**.
-- Writing type-safe composables (`usePlatformAdaptation.ts`, `useSafeFormValidation.ts`, `useBodyScrollLock.ts`) or Pinia setup stores.
+- Writing type-safe composables (`usePlatformAdaptation.ts`, `useSafeFormValidation.ts`) or Pinia setup stores.
 - Engineering cross-platform resilience across **iOS / iPhone**, **Android**, **macOS**, and **Windows**.
 - Ensuring cross-browser compatibility across **Safari**, **Chrome**, **Firefox**, and **Edge**.
 - Hardening frontend code against DOM XSS, prototype pollution, token exfiltration, and open redirects.
@@ -69,7 +69,7 @@ Every component and layout MUST be validated against all four target platforms. 
 
 | Platform | Core Challenge & Bug Risk | Mandatory Solution |
 | :--- | :--- | :--- |
-| **iPhone / iOS** (WebKit) | • Expanding Safari toolbars break `100vh`<br>• Notches & home indicators overlap buttons<br>• Input focus triggers disruptive auto-zoom<br>• Momentum scroll freezes on `overflow: hidden`<br>• Grey tap overlay boxes | • Use `100dvh` (with `100vh` fallback)<br>• Apply `env(safe-area-inset-*)` & `viewport-fit=cover`<br>• Enforce input `font-size: 16px`<br>• Use `useBodyScrollLock` (`position: fixed` offset)<br>• Add `-webkit-tap-highlight-color: transparent` |
+| **iPhone / iOS** (WebKit) | • Expanding Safari toolbars break `100vh`<br>• Notches & home indicators overlap buttons<br>• Input focus triggers disruptive auto-zoom<br>• Momentum scroll freezes on `overflow: hidden`<br>• Grey tap overlay boxes | • Use `100dvh` (with `100vh` fallback)<br>• Apply `env(safe-area-inset-*)` & `viewport-fit=cover`<br>• Enforce input `font-size: 16px`<br>• Rely on Radix Vue native scroll locking<br>• Add `-webkit-tap-highlight-color: transparent` |
 | **Android** (Blink / Chrome) | • 300ms double-tap gesture latency<br>• Hardware/gesture back exits app instead of closing modal<br>• Unwanted pull-to-refresh on dialog scroll<br>• Backdrop flex-sibling render flash (16–50ms) | • Apply `touch-action: manipulation`<br>• Use `useAndroidBackModalSync` via `popstate`<br>• Apply `overscroll-behavior-y: contain`<br>• Decouple backdrop & dialog into distinct fixed layers |
 | **macOS** (Safari / Chrome) | • Blurry font rendering on Retina<br>• Power-user shortcut confusion (Cmd vs Ctrl)<br>• Two-finger swipe triggers browser history | • Add `-webkit-font-smoothing: antialiased`<br>• Bind `event.metaKey` (⌘) vs `event.ctrlKey`<br>• Isolate slider touch actions (`touch-action: pan-y`) |
 | **Windows** (Edge / Chrome) | • Physical scrollbars cause layout shifts (CLS)<br>• Ugly default system scrollbars<br>• Unreadable UI in High Contrast Mode<br>• Touch-screen laptops trigger sticky hover bugs | • Enforce `scrollbar-gutter: stable` on root wrappers<br>• Custom sleek styling (`scrollbar-width: thin`)<br>• Support `@media (forced-colors: active)`<br>• Isolate hover via `@media (hover: hover) and (pointer: fine)` |
@@ -140,9 +140,8 @@ node .agent/skills/developing-vue-frontend/scripts/vue-audit-tool.mjs --path src
 
 ## 5. Supporting Resources & Examples
 
-- **Radix Vue Dialog Example**: [radix-dialog-example.vue](./examples/radix-dialog-example.vue) — Production dialog built on Radix Vue `DialogRoot` with cross-platform scroll lock, safe-area insets, Android back sync, and `@supports` backdrop-filter fallback.
+- **Radix Vue Dialog Example**: [radix-dialog-example.vue](./examples/radix-dialog-example.vue) — Production dialog built on Radix Vue `DialogRoot` with native scroll lock, safe-area insets, Android back sync, and `@supports` backdrop-filter fallback.
 - **Platform Adaptation Composable**: [usePlatformAdaptation.ts](./examples/usePlatformAdaptation.ts) — TypeScript composable for OS detection, visual viewport tracking, shortcut formatting (⌘ vs Ctrl), and Android back-button modal sync.
-- **Safe Scroll Locking Composable**: [useBodyScrollLock.ts](./examples/useBodyScrollLock.ts) — Zero-deadlock WebKit momentum scroll locking with Windows `scrollbar-gutter` awareness.
 - **Safe Form Validation Composable**: [useSafeFormValidation.ts](./examples/useSafeFormValidation.ts) — Type-safe form validation with XSS sanitization and WAI-ARIA helpers.
 - **Secure Pinia Auth Store**: [secure-auth-store.ts](./examples/secure-auth-store.ts) — In-memory access token storage, HttpOnly silent refresh, and XSS isolation.
 - **Cross-Platform & Browser Guide**: [cross-platform-browser-guide.md](./references/cross-platform-browser-guide.md) — Deep architectural guide on iOS, Android, Mac, Windows viewport quirks and Safari/Chrome/Firefox/Edge compatibility matrices.

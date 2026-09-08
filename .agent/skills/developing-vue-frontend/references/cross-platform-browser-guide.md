@@ -13,7 +13,7 @@ This architectural reference provides comprehensive device-specific quirks, brow
 | `100vh` ignores toolbar | Full-height layouts get clipped by the Safari address bar | Use `100dvh` with `100vh` fallback: `height: 100vh; height: 100dvh;` |
 | Notches & Dynamic Island | Content overlaps hardware cutouts | `env(safe-area-inset-*)` + `<meta name="viewport" content="viewport-fit=cover">` |
 | Input zoom bug | iOS auto-zooms viewport when `font-size < 16px` on inputs | Enforce `font-size: 16px` on `<input>`, `<select>`, `<textarea>` |
-| Momentum scroll freeze | `overflow: hidden` during inertia freezes WebKit compositor 3–5s | Use `useBodyScrollLock` with `position: fixed` pattern |
+| Momentum scroll freeze | `overflow: hidden` during inertia freezes WebKit compositor 3–5s | Use Radix Vue primitives (`DialogRoot`), which natively handle safe body scroll locking |
 | Grey tap highlight | Ugly grey overlay on tapped elements | `-webkit-tap-highlight-color: transparent` |
 | Virtual keyboard | Software keyboard pushes layout, overlaps fixed elements | Visual Viewport API: `window.visualViewport.height` tracking |
 

@@ -26,7 +26,6 @@ import {
   DialogTrigger,
 } from 'radix-vue';
 import { X } from 'lucide-vue-next';
-import { useBodyScrollLock } from './useBodyScrollLock';
 import { useAndroidBackModalSync } from './usePlatformAdaptation';
 
 const props = defineProps<{
@@ -39,12 +38,13 @@ const emit = defineEmits<{
   (e: 'update:open', value: boolean): void;
 }>();
 
-// Cross-platform scroll lock: prevents iOS WebKit momentum deadlock & Windows scrollbar shift
-const isOpenRef = toRef(props, 'open');
-useBodyScrollLock(isOpenRef);
-
 // Android hardware/gesture back button: pressing back closes dialog instead of navigating away
+// (Radix Vue handles Escape and pointer events, but Android back button triggers popstate)
+const isOpenRef = toRef(props, 'open');
 useAndroidBackModalSync(isOpenRef, () => emit('update:open', false));
+
+// Note: Radix Vue DialogRoot natively locks document.body scroll and compensates
+// for scrollbar width shifts out-of-the-box without manual body-lock composables.
 
 const handleOpenChange = (value: boolean) => {
   emit('update:open', value);
