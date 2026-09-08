@@ -1,7 +1,6 @@
-# Vue 3 Security & High-Converting UX Checklist
+# Vue 3 Security, Radix Vue & Compatibility Checklist
 
-This checklist provides a senior developer reference for building high-converting, resilient, and enterprise-secure Vue
-3 applications.
+This checklist provides a senior developer reference for building resilient, accessible, and enterprise-secure Vue 3 applications with mandatory Radix Vue primitives, cross-platform device support, and cross-browser compatibility.
 
 ---
 
@@ -41,37 +40,29 @@ This checklist provides a senior developer reference for building high-convertin
   `Number(value ?? 0).toFixed(2)` to prevent fatal `TypeError` when APIs return numbers as strings.
 - [ ] **Division-by-Zero Defense**: Guard metric ratios, percentages, and progress formulas against zero or negative
   denominators (`denominator <= 0 ? 0 : ...`).
-- [ ] **Indicator & Badge Threshold Guards**: Never display metric badges, delta chips, or counter indicators with
-  negative or meaningless zero states when representing positive metrics (`val <= 0 ? null : val`).
-- [ ] **Placeholder Link Suppression**: When `href` defaults or evaluates to a placeholder target like `'#'`, suppress
-  unintended page navigation via `@click="isPlaceholder && $event.preventDefault()"` and set
-  `:aria-disabled="isPlaceholder"`.
 
 ---
 
-## Part 2: High-Converting Selling UI/UX Checklist
+## Part 2: Radix Vue Mandatory Primitives Checklist
 
-### 1. Visual Hierarchy & Aesthetic Impact
+### 1. Component Selection
 
-- [ ] **Magnetic Above-The-Fold**: Clear value proposition (H1), concise sub-headline explaining the transformation,
-  high-contrast primary CTA, and trust social proof badge.
-- [ ] **Layered Depth & Glassmorphism**: Use translucent glass backgrounds (`backdrop-filter: blur(12px)`), subtle
-  borders (`1px solid rgba(255,255,255,0.08)`), and colored ambient drop-shadows.
-- [ ] **Refined Micro-Interactions**: Hover elevation, subtle button press physics (`transform: scale(0.98)`), loading
-  spinners on submit, and smooth accordion transitions.
-- [ ] **Modern Typography**: Pair high-impact display sans-serif (Inter, Plus Jakarta Sans, Outfit) with consistent
-  vertical rhythm.
+- [ ] **Dialogs / Modals**: Use `DialogRoot` + `DialogPortal` + `DialogOverlay` + `DialogContent`. Never use custom `<Teleport>` + `v-if` + manual focus trapping.
+- [ ] **Popovers**: Use `PopoverRoot` + `PopoverTrigger` + `PopoverContent`. Never use custom `position: absolute` with `v-if` toggle.
+- [ ] **Dropdown Menus**: Use `DropdownMenuRoot` + `DropdownMenuTrigger` + `DropdownMenuContent`. Never use custom `<ul>` with `@click.outside`.
+- [ ] **Select / Combobox**: Use `SelectRoot` + `SelectTrigger` + `SelectContent` + `SelectItem`. Never use custom `<div>` with `role="listbox"`.
+- [ ] **Tooltips**: Use `TooltipProvider` + `TooltipRoot` + `TooltipTrigger` + `TooltipContent`. Never use `title` attributes or custom hover `<div>`.
+- [ ] **Accordions**: Use `AccordionRoot` + `AccordionItem` + `AccordionTrigger` + `AccordionContent`. Never use custom `v-if` toggle panels.
+- [ ] **Tabs**: Use `TabsRoot` + `TabsList` + `TabsTrigger` + `TabsContent`. Never use custom `<button>` + `v-if` switching.
+- [ ] **Alert Dialogs**: Use `AlertDialogRoot` + `AlertDialogAction` + `AlertDialogCancel`. Never use `window.confirm()`.
 
-### 2. Conversion Friction Eliminators
+### 2. Integration Quality
 
-- [ ] **Interactive Pricing Toggles**: Smooth monthly/yearly billing switches with clear discount badges (e.g., "Save
-  20%").
-- [ ] **Risk Reversal Indicators**: Place "30-Day Money-Back Guarantee", "No Credit Card Required", or "Cancel Anytime"
-  directly underneath key CTA buttons.
-- [ ] **Inline Form Validation**: Immediate feedback on blur, green checkmarks on valid inputs, clear and human error
-  messages.
-- [ ] **Mobile-First Responsive Layout**: Single column flow on mobile, sticky CTA bar on scroll for mobile users, touch
-  target sizes at least 44x44px.
+- [ ] **Unstyled-First**: Radix Vue components have zero default styling — all CSS is provided by the project.
+- [ ] **Slot Composition**: Use `as-child` prop for trigger elements to render custom trigger buttons without extra DOM wrappers.
+- [ ] **Focus Management**: Do NOT manually implement `tabindex`, `focus()`, or keyboard trapping for Radix primitives — it's handled internally.
+- [ ] **Animation via `data-state`**: Use Radix's `data-state="open|closed"` attributes for CSS animations or Vue `<Transition>`.
+- [ ] **Portal Usage**: Use Radix's built-in portals (`DialogPortal`, `PopoverPortal`) instead of raw `<Teleport to="body">`.
 
 ---
 
@@ -93,45 +84,12 @@ This checklist provides a senior developer reference for building high-convertin
 
 ---
 
-## Part 4: Mobile Viewport & Modal Architecture Checklist (WebKit & Blink Resiliency)
-
-### 1. Scroll Locking & WebKit Compositor Deadlock Prevention
-
-- [ ] **Zero Direct Body Overflow Mutation**: Never execute `document.body.style.overflow = 'hidden'` on open. Doing so
-  during momentum scroll freezes iOS Safari compositor for 3–5 seconds and drops tile rendering.
-- [ ] **Position-Fixed Scroll Lock Pattern**: Use `useBodyScrollLock` to save scroll offset (`window.scrollY`), apply
-  `position: fixed; width: 100%; top: -${scrollY}px`, and restore with `window.scrollTo({ behavior: 'instant' })`.
-- [ ] **Chained Scroll Containment**: Apply `overscroll-behavior: contain` to all scrollable modal containers to prevent
-  momentum transfer to the underlying page.
-
-### 2. Layout Stacking & Android Blink Glitch Prevention
-
-- [ ] **Decouple Backdrop and Dialog Containers**: Never place a `position: fixed` backdrop and `position: relative`
-  modal dialog as sibling flex-items inside one `display: flex` wrapper. Chromium calculates them as flex siblings on
-  initial tick, causing a 16–50ms visual flash.
-- [ ] **Symmetrical Root Transitions**: Place `<Transition>` directly at the root under `<Teleport to="body">` with
-  `v-if="isOpen"` on the backdrop container and `v-if="isOpen"` on the inner dialog card. Never wrap `<Transition>`
-  inside an outer unmounting `div`.
-- [ ] **Conditional Event Listener Lifecycle**: Never attach global `window.addEventListener('keydown')` unconditionally
-  on `onMounted` when a modal is closed. Use `watch(isOpen, ..., { immediate: true })` and clean up on `onUnmounted`.
-- [ ] **Hardware Acceleration**: Explicitly set `-webkit-transform: translate3d(0,0,0); transform: translate3d(0,0,0);`
-  and `-webkit-overflow-scrolling: touch` on the modal dialog card to enforce an isolated GPU layer.
-
-### 3. Touch Gesture & Asset Optimization
-
-- [ ] **Hover Isolation on Touch**: Wrap desktop hover interactions (`group-hover:opacity-100`, hover overlays) in
-  `@media (hover: hover) and (pointer: fine)` to stop mobile taps from triggering synthetic hover states.
-- [ ] **Eager Modal Images**: Set `loading="eager"` and explicit aspect ratios on primary modal hero images to eliminate
-  async decoding layout jumps.
-
----
-
-## Part 5: Cross-Platform Device & OS Matrix (Android, iOS, Mac, Windows)
+## Part 4: Cross-Platform Device Matrix (iOS, Android, macOS, Windows)
 
 ### 1. iOS / iPhone & iPad (WebKit)
 - [ ] **Dynamic Viewport (`100dvh`)**: Use `100dvh` (with `100vh` fallback) so modals and full-height layouts adapt when Safari address bars expand/collapse.
 - [ ] **Safe Area Insets**: Use `env(safe-area-inset-top/bottom/left/right)` on sticky bars and modals; add `viewport-fit=cover` in HTML head.
-- [ ] **No Input Zoom**: Set input `font-size: 16px` (Tailwind `text-base`) on mobile to prevent iOS Safari from zooming into the viewport.
+- [ ] **No Input Zoom**: Set input `font-size: 16px` on mobile to prevent iOS Safari from zooming into the viewport.
 - [ ] **Tap Highlight Clear**: Add `-webkit-tap-highlight-color: transparent` to eliminate grey tap boxes.
 - [ ] **Virtual Keyboard Handling**: Use Visual Viewport API (`window.visualViewport`) to adjust scrollable drawers when software keyboard pops up.
 
@@ -149,8 +107,30 @@ This checklist provides a senior developer reference for building high-convertin
 
 ### 4. Windows (Edge, Chrome & Firefox)
 - [ ] **Zero Layout Shift (CLS)**: Add `scrollbar-gutter: stable` to prevent the page from twitching horizontally when scrollbars appear or lock.
-- [ ] **Custom Modern Scrollbars**: Style scrollbars (`scrollbar-width: thin; scrollbar-color: ...`).
+- [ ] **Custom Modern Scrollbars**: Style scrollbars (`scrollbar-width: thin; scrollbar-color: ...` + `::-webkit-scrollbar`).
 - [ ] **Windows High Contrast Mode**: Verify styles with `@media (forced-colors: active)` using system keywords (`CanvasText`, `ButtonText`).
 - [ ] **Touch Laptop Hybrid Pointer**: Disentangle touch gestures from mouse hovers via `@media (hover: hover) and (pointer: fine)` vs `@media (pointer: coarse)`.
 
+---
 
+## Part 5: Cross-Browser Compatibility Checklist
+
+### 1. CSS Feature Guards
+- [ ] **`@supports` for `backdrop-filter`**: Wrap glassmorphic styles in `@supports (backdrop-filter: blur(1px))` with opaque fallback background.
+- [ ] **Vendor prefix**: Always pair `backdrop-filter` with `-webkit-backdrop-filter`.
+- [ ] **Dynamic viewport**: Use dual declaration `height: 100vh; height: 100dvh;` for browsers with partial `dvh` support.
+
+### 2. Scrollbar Strategy
+- [ ] **Firefox**: Use `scrollbar-width: thin; scrollbar-color: <thumb> <track>;` for native thin scrollbar.
+- [ ] **Chrome / Safari / Edge**: Use `::-webkit-scrollbar`, `::-webkit-scrollbar-thumb`, `::-webkit-scrollbar-track` pseudo-elements.
+- [ ] **Safari quirk**: `scrollbar-gutter: stable` is NOT supported — compensate with `padding-right` on scroll lock.
+
+### 3. Font Rendering
+- [ ] **Safari / Chrome**: Apply `-webkit-font-smoothing: antialiased;` for Retina clarity.
+- [ ] **Firefox / macOS**: Apply `-moz-osx-font-smoothing: grayscale;`.
+
+### 4. Verified Browser Targets
+- [ ] **Safari 16+** (WebKit) — tested and working.
+- [ ] **Chrome 100+** (Blink) — tested and working.
+- [ ] **Firefox 115+** (Gecko) — tested and working.
+- [ ] **Edge 100+** (Blink) — tested and working, including High Contrast Mode.

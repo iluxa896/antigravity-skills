@@ -45,6 +45,8 @@ Checks performed:
   ✔ Data: Uncoerced .toFixed() calls without Number() casting
   ✔ Cross-Platform: Raw 100vh usage without dynamic 100dvh fallback (iOS/Android Safari/Chrome)
   ✔ Cross-Platform: Mobile input font-size < 16px (iOS auto-zoom prevention)
+  ✔ Radix Vue: Interactive overlays/dialogs/dropdowns must use Radix Vue primitives
+  ✔ Cross-Browser: CSS backdrop-filter vendor prefix (-webkit-backdrop-filter)
 `);
     process.exit(0);
 }
@@ -172,6 +174,30 @@ function auditVueFile(filePath) {
             severity: 'WARNING',
             rule: 'VUE-CROSSPLATFORM-IOS-INPUT-ZOOM',
             message: 'Input element with font size < 16px detected. iOS Safari triggers disruptive automatic viewport zoom on focus.',
+        });
+    }
+
+    // Check 10: Radix Vue primitives for overlays, dialogs, popovers, dropdowns
+    const hasCustomOverlay = (
+        /<(?:div|section|dialog)\b[^>]*\b(?:role=['"](?:dialog|alertdialog)['"]|class=['"][^'"]*\b(?:modal(?:-dialog|-overlay|-content)?|dialog(?:-box|-content)?|popover(?:-content)?|dropdown-menu)\b[^'"]*['"])/i.test(content)
+    );
+    const usesRadix = /from\s+['"]radix-vue['"]/i.test(content) || /from\s+['"]@radix-ui/i.test(content);
+    if (hasCustomOverlay && !usesRadix) {
+        issues.push({
+            file: relPath,
+            severity: 'WARNING',
+            rule: 'VUE-RADIX-PRIMITIVE-REQUIRED',
+            message: 'Custom overlay/dialog/popover pattern detected without radix-vue. Use Radix Vue primitives (DialogRoot, PopoverRoot, DropdownMenuRoot) for accessible keyboard navigation, focus trapping, and cross-platform overlay resilience.',
+        });
+    }
+
+    // Check 11: Cross-browser backdrop-filter vendor prefix
+    if (/backdrop-filter:\s*blur/i.test(content) && !/-webkit-backdrop-filter:\s*blur/i.test(content)) {
+        issues.push({
+            file: relPath,
+            severity: 'WARNING',
+            rule: 'VUE-CROSSBROWSER-BACKDROP-FILTER',
+            message: 'CSS backdrop-filter used without -webkit-backdrop-filter vendor prefix. Required for Safari 16+ support.',
         });
     }
 

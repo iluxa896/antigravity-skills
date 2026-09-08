@@ -35,4 +35,13 @@
 - [x] Refactor `creating-agent-skills` meta-skill and upgrade `validate-skills.mjs`
 - [x] Run full workspace test suite (validate-skills, php-lint, vue-audit, security-audit, etc.)
 
+## Phase 17: Rework Vue Frontend Skill (Radix Vue, Cross-Platform & Cross-Browser Mandate)
+- [x] Purge sales/marketing CRO focus from Vue skill and streamline for core frontend engineering
+- [x] Mandate Radix Vue for all interactive UI primitives (Dialogs, Popovers, Dropdowns, Selects, Tooltips, Tabs)
+- [x] Enforce mandatory cross-platform engineering (Windows scrollbars, macOS Retina/keys, iOS safe areas/100dvh/zoom, Android back button/overscroll)
+- [x] Enforce cross-browser compatibility matrix (Safari 16+, Chrome 100+, Firefox 115+, Edge 100+) with `@supports` and vendor prefixes
+- [x] Author `examples/radix-dialog-example.vue`, `references/cross-platform-browser-guide.md`, and `resources/vue-security-compat-checklist.md`
+- [x] Upgrade `scripts/vue-audit-tool.mjs` with Radix Vue primitive detection and cross-browser `-webkit-backdrop-filter` check
+- [x] Validate all skills with `validate-skills.mjs` (0 errors, 0 warnings)
+
 
