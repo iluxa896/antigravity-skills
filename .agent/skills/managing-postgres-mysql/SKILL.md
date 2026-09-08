@@ -1,125 +1,113 @@
 ---
 name: managing-postgres-mysql
 description: >-
-  Provides expert DBA workflows, query tuning, indexing strategies, diagnostic queries,
-  and zero-downtime migration guidelines for PostgreSQL and MySQL. Use when analyzing slow queries,
-  tuning execution plans (EXPLAIN ANALYZE), resolving deadlocks, configuring connection pooling (pgBouncer),
-  auditing migrations for table locks, or optimizing autovacuum and buffer caches.
+  Provides expert DBA workflows, query tuning, indexing strategies, diagnostic queries, and
+  zero-downtime migration guidelines for PostgreSQL and MySQL. Use when analyzing slow queries,
+  tuning execution plans (EXPLAIN ANALYZE), resolving deadlocks, configuring connection pooling
+  (pgBouncer/ProxySQL), auditing migrations for table locks, or optimizing autovacuum and buffer caches.
 ---
 
-# Managing PostgreSQL & MySQL Databases (DBA Master Skill)
+# Managing PostgreSQL & MySQL Databases
 
 ## When to use this skill
-- Analyzing slow queries, execution plans (`EXPLAIN`, `EXPLAIN ANALYZE`, `EXPLAIN FORMAT=JSON`).
-- Diagnosing deadlocks, lock contention, active long-running queries, or table bloat.
-- Designing high-performance indexing strategies (B-Tree, GIN, GiST, Partial, Covering/INCLUDE, Compound indexes).
-- Executing non-blocking, zero-downtime schema migrations (DDL safety, concurrent index creation, lock timeouts).
-- Configuring connection pools (pgBouncer, ProxySQL), autovacuum tuning, and buffer pool optimization.
-- Running the automated migration safety guard (`scripts/migration-safety-guard.mjs`).
+- Analyzing slow queries and execution plans (`EXPLAIN`, `EXPLAIN ANALYZE`, `EXPLAIN FORMAT=JSON`).
+- Diagnosing deadlocks, lock contention, long-running queries, and table bloat.
+- Designing high-performance indexing (B-Tree, GIN, GiST, Partial, Covering/INCLUDE, Compound).
+- Executing non-blocking zero-downtime schema migrations.
+- Configuring pgBouncer, ProxySQL, autovacuum, and buffer pool optimization.
 
 ---
 
-## 1. Degrees of Freedom Model
+## 1. Degrees of Freedom
 
-| Freedom Level | Area | Application & Constraints |
+| Level | Area | Constraints |
 | :--- | :--- | :--- |
-| **High Freedom** | Schema Design & Normalization | Designing relational entities, choosing partitioning keys, denormalization trade-offs, JSONB usage vs normalized tables. |
-| **Medium Freedom** | Index Types & Memory Sizing | Index type selection (B-Tree vs GIN vs Partial), `work_mem` sizing per query complexity, autovacuum scale factors. |
-| **Low Freedom** | Production DDL Execution | Mandatory `SET lock_timeout = '3s'`, mandatory `CONCURRENTLY` on index creation/drops, batched backfills (zero mass updates), instant column additions. |
+| **High** | Schema Design | Entity modeling, partitioning keys, JSONB vs normalized tables, denormalization trade-offs. |
+| **Medium** | Index Types & Memory | B-Tree vs GIN vs Partial, `work_mem` sizing, autovacuum scale factors. |
+| **Low** | Production DDL | Mandatory `SET lock_timeout = '3s'`, mandatory `CONCURRENTLY` on index ops, batched backfills only. |
 
 ---
 
-## 2. Safety Checklist for Database Operations
+## 2. Production Safety Checklist
 
-When performing write operations, DDL migrations, or index drops on production databases, execute the following checklist:
-
-```markdown
-- [ ] Step 1: Check Lock Contention & Active Queries
-      - Run active query diagnostics before attempting DDL modifications.
-- [ ] Step 2: Set Lock Timeout Protection
-      - Always configure explicit lock timeouts (SET lock_timeout = '3s') to prevent connection pile-up.
-- [ ] Step 3: Non-Blocking Execution Strategy
-      - Use CREATE INDEX CONCURRENTLY (PostgreSQL) or ALGORITHM=INPLACE, LOCK=NONE (MySQL).
-- [ ] Step 4: Dry Run Execution Plan
-      - Run EXPLAIN (ANALYZE, BUFFERS) on target queries before and after index modifications.
-- [ ] Step 5: Automated DDL Audit
-      - Run migration linter: node .agent/skills/managing-postgres-mysql/scripts/migration-safety-guard.mjs
+```
+[ ] 1. Check Active Queries & Locks — run diagnostics before any DDL.
+[ ] 2. Set Lock Timeout — SET lock_timeout = '3s' to prevent connection pile-up.
+[ ] 3. Non-Blocking Strategy — CREATE INDEX CONCURRENTLY (PG) or ALGORITHM=INPLACE,LOCK=NONE (MySQL).
+[ ] 4. Dry-Run Execution Plan — EXPLAIN (ANALYZE, BUFFERS) before and after index changes.
+[ ] 5. Automated DDL Audit — node .agent/skills/managing-postgres-mysql/scripts/migration-safety-guard.mjs --path migrations/ --dialect postgres
 ```
 
 ---
 
-## 3. Workflow 1: PostgreSQL Diagnostics & Tuning
+## 3. PostgreSQL Diagnostics
 
-### A. Identify Slow Queries & Lock Contention
+### Active Slow Queries & Lock Contention
 ```sql
--- PostgreSQL: Active queries running longer than 5 seconds
-SELECT 
-    pid, 
-    usename, 
-    client_addr, 
-    now() - query_start AS duration, 
-    state, 
-    wait_event_type, 
-    wait_event, 
-    query 
-FROM pg_stat_activity 
-WHERE state != 'idle' 
-  AND (now() - query_start) > interval '5 seconds'
+SELECT pid, usename, client_addr,
+       now() - query_start AS duration,
+       state, wait_event_type, wait_event, query
+FROM   pg_stat_activity
+WHERE  state != 'idle'
+  AND  (now() - query_start) > interval '5 seconds'
 ORDER BY duration DESC;
 ```
 
-### B. Execution Plan Analysis
-Always request `BUFFERS` to inspect shared hit/read pages:
+### Execution Plan (always use BUFFERS)
 ```sql
 EXPLAIN (ANALYZE, BUFFERS, VERBOSE, SETTINGS)
 SELECT c.id, c.name, COUNT(o.id) AS total_orders
-FROM customers c
-JOIN orders o ON o.customer_id = c.id
-WHERE o.created_at >= NOW() - INTERVAL '30 days'
+FROM   customers c
+JOIN   orders o ON o.customer_id = c.id
+WHERE  o.created_at >= NOW() - INTERVAL '30 days'
 GROUP BY c.id, c.name;
 ```
 
+### Table Bloat & Cache Hit Ratio
+See [postgres-dba-toolkit.sql](./examples/postgres-dba-toolkit.sql) for bloat estimates, index usage stats, and cache hit ratio queries.
+
 ---
 
-## 4. Workflow 2: MySQL & InnoDB Diagnostics & Tuning
+## 4. MySQL / InnoDB Diagnostics
 
-### A. Process List & Lock Wait Inspection
+### Process List & Lock Waits
 ```sql
--- MySQL: Long running processes
-SELECT 
-    id, user, host, db, command, time, state, info 
-FROM information_schema.processlist 
-WHERE command != 'Sleep' 
-  AND time > 5 
+SELECT id, user, host, db, command, time, state, info
+FROM   information_schema.processlist
+WHERE  command != 'Sleep' AND time > 5
 ORDER BY time DESC;
 ```
 
-### B. JSON Execution Plan
+### JSON Execution Plan
 ```sql
 EXPLAIN FORMAT=JSON
-SELECT u.id, u.email, p.title 
-FROM users u 
-JOIN posts p ON p.user_id = u.id 
-WHERE p.status = 'published' AND u.created_at > '2026-01-01';
+SELECT u.id, u.email, p.title
+FROM   users u
+JOIN   posts p ON p.user_id = u.id
+WHERE  p.status = 'published' AND u.created_at > '2026-01-01';
 ```
+
+### InnoDB Lock & Transaction State
+See [mysql-dba-toolkit.sql](./examples/mysql-dba-toolkit.sql) for InnoDB lock waits, transaction states, and thread starvation queries.
 
 ---
 
-## 5. Automated DDL Migration Verification
+## 5. Zero-Downtime Migration Pattern
 
-Run the migration safety guard across SQL migration directories:
-
-```bash
-node .agent/skills/managing-postgres-mysql/scripts/migration-safety-guard.mjs --path migrations/ --dialect postgres
-```
+5-phase safe column addition — see [zero-downtime-migration-template.sql](./examples/zero-downtime-migration-template.sql):
+1. `ADD COLUMN col TYPE DEFAULT NULL` (instant metadata change).
+2. Batched backfill in chunks with `WHERE id BETWEEN x AND y`.
+3. `CREATE INDEX CONCURRENTLY` on the new column.
+4. Apply `NOT NULL` constraint after backfill is verified.
+5. Drop old column after dual-write period ends.
 
 ---
 
-## 6. Quick Reference Tools & Resources
+## 6. Reference Files
 
-- **Migration Safety Guard Script**: [migration-safety-guard.mjs](./scripts/migration-safety-guard.mjs) - Node.js CLI script inspecting SQL migrations for blocking table locks and missing timeouts.
-- **Zero-Downtime Migration Pattern**: [zero-downtime-migration-template.sql](./examples/zero-downtime-migration-template.sql) - Production SQL migration demonstrating safe 5-phase column addition, backfill, and index creation.
-- **PostgreSQL DBA Diagnostic Script**: [postgres-dba-toolkit.sql](./examples/postgres-dba-toolkit.sql) - Diagnostic queries for slow queries, cache hit ratio, and table bloat.
-- **MySQL/InnoDB Diagnostic Script**: [mysql-dba-toolkit.sql](./examples/mysql-dba-toolkit.sql) - Diagnostic queries for InnoDB locks, transaction states, and thread starvation.
-- **DBA Tuning Playbook**: [database-tuning-playbook.md](./references/database-tuning-playbook.md) - Deep reference on buffer pool calculation, autovacuum aggressive tuning, and connection pool sizing.
-- **Zero-Downtime Migration Guide**: [zero-downtime-migrations.md](./resources/zero-downtime-migrations.md) - Architectural guide on online schema changes, shadow tables, and lock timeouts.
+- **Migration Safety Guard**: [migration-safety-guard.mjs](./scripts/migration-safety-guard.mjs) — lints SQL migrations for blocking locks and missing timeouts.
+- **Zero-Downtime Template**: [zero-downtime-migration-template.sql](./examples/zero-downtime-migration-template.sql)
+- **PostgreSQL Toolkit**: [postgres-dba-toolkit.sql](./examples/postgres-dba-toolkit.sql)
+- **MySQL Toolkit**: [mysql-dba-toolkit.sql](./examples/mysql-dba-toolkit.sql)
+- **Tuning Playbook**: [database-tuning-playbook.md](./references/database-tuning-playbook.md) — buffer pool calc, autovacuum tuning, connection pool sizing.
+- **Migration Guide**: [zero-downtime-migrations.md](./resources/zero-downtime-migrations.md) — online schema changes, shadow tables, lock timeouts.

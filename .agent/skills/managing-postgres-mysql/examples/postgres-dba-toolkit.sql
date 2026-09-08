@@ -26,15 +26,17 @@ JOIN pg_catalog.pg_stat_activity blocking_activity ON blocking_activity.pid = bl
 WHERE NOT blocked_locks.granted;
 
 -- 2. Unused & Redundant Indexes
-SELECT 
-    schemaname || '.' || relname AS table_name,
-    indexrelname AS index_name,
-    idx_scan AS number_of_scans,
-    pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
-FROM pg_stat_user_indexes
-WHERE idx_scan = 0
-  AND idx_unique = false
-ORDER BY pg_relation_size(indexrelid) DESC;
+SELECT
+    s.schemaname || '.' || s.relname AS table_name,
+    s.indexrelname                   AS index_name,
+    s.idx_scan                       AS number_of_scans,
+    pg_size_pretty(pg_relation_size(s.indexrelid)) AS index_size
+FROM pg_stat_user_indexes s
+JOIN pg_index i ON i.indexrelid = s.indexrelid
+WHERE s.idx_scan = 0
+  AND i.indisunique = false
+  AND i.indisprimary = false
+ORDER BY pg_relation_size(s.indexrelid) DESC;
 
 -- 3. Top Tables by Disk Size & Bloat Candidate Check
 SELECT 

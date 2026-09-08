@@ -23,8 +23,9 @@ Google uses Core Web Vitals as a page experience ranking factor:
 | Metric | Threshold | Key Optimization Tactics |
 | :--- | :--- | :--- |
 | **LCP** (Largest Contentful Paint) | `< 2.5s` | Preload hero image (`<link rel="preload" as="image">`), server-side TTFB `< 600ms`, WebP/AVIF formats. |
-| **INP** (Interaction to Next Paint) | `< 200ms` | Break up long tasks (>50ms) using `scheduler.yield()` or `requestAnimationFrame`, avoid synchronous blocking loops. |
+| **INP** (Interaction to Next Paint) | `< 200ms` | Break up long tasks (>50ms) using `scheduler.yield()` (Chrome 115+) or `requestAnimationFrame`; avoid synchronous blocking loops. |
 | **CLS** (Cumulative Layout Shift) | `< 0.1` | Specify explicit `width` and `height` on all `<img>` and `<video>` tags, reserve layout space for dynamic ads/banners. |
+| **TTFB** (Time to First Byte) | `< 800ms` | Server-side OPcache, Redis page cache, geo-distributed CDN edge, optimized DB queries. |
 
 ---
 

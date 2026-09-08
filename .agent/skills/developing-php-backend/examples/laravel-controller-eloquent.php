@@ -2,24 +2,50 @@
 
 namespace App\Http\Requests {
     use Illuminate\Foundation\Http\FormRequest;
+    use Illuminate\Support\Facades\Gate;
 
     /**
-     * Form Request encapsulating request validation & authorization rules for post creation.
+     * Form Request with Policy-based authorization and strict validation.
      */
     class StorePostRequest extends FormRequest
     {
         public function authorize(): bool
         {
-            return true;
+            // Explicitly check policy — never blindly return true
+            return Gate::allows('create', \App\Models\Post::class);
         }
 
+        /** @return array<string, list<string>> */
         public function rules(): array
         {
             return [
-                'title' => 'required|string|max:255',
-                'content' => 'required|string',
-                'author_id' => 'required|integer|exists:users,id',
+                'title'     => ['required', 'string', 'max:255'],
+                'content'   => ['required', 'string'],
+                'author_id' => ['required', 'integer', 'exists:users,id'],
             ];
+        }
+    }
+}
+
+namespace App\DTOs {
+    /**
+     * Readonly DTO using PHP 8.1 constructor promotion.
+     */
+    readonly class CreatePostData
+    {
+        public function __construct(
+            public string $title,
+            public string $content,
+            public int    $authorId,
+        ) {}
+
+        public static function fromRequest(\App\Http\Requests\StorePostRequest $request): self
+        {
+            return new self(
+                title:    $request->string('title')->trim()->value(),
+                content:  $request->string('content')->trim()->value(),
+                authorId: (int) $request->validated('author_id'),
+            );
         }
     }
 }
@@ -27,20 +53,18 @@ namespace App\Http\Requests {
 namespace App\Http\Resources {
     use Illuminate\Http\Resources\Json\JsonResource;
 
-    /**
-     * API Resource for structuring and serializing Post model data.
-     */
     class PostResource extends JsonResource
     {
-        public function toArray($request): array
+        /** @return array<string, mixed> */
+        public function toArray(\Illuminate\Http\Request $request): array
         {
             return [
-                'id' => (int) $this->id,
-                'title' => (string) $this->title,
-                'content' => (string) $this->content,
-                'author' => [
-                    'id' => (int) $this->author->id,
-                    'name' => (string) $this->author->name,
+                'id'         => $this->id,
+                'title'      => $this->title,
+                'content'    => $this->content,
+                'author'     => [
+                    'id'   => $this->author->id,
+                    'name' => $this->author->name,
                 ],
                 'created_at' => $this->created_at?->toIso8601String(),
             ];
@@ -49,84 +73,76 @@ namespace App\Http\Resources {
 }
 
 namespace App\Actions {
+    use App\DTOs\CreatePostData;
     use App\Models\Post;
     use Illuminate\Support\Facades\DB;
 
     /**
-     * Dedicated Action class handling post creation domain logic within a DB transaction.
+     * Single-responsibility Action: creates a Post inside an atomic transaction.
      */
     class CreatePostAction
     {
-        public function execute(array $data): Post
+        public function execute(CreatePostData $data): Post
         {
-            return DB::transaction(function () use ($data): Post {
-                return Post::create([
-                    'title' => $data['title'],
-                    'content' => $data['content'],
-                    'author_id' => $data['author_id'],
+            return DB::transaction(static function () use ($data): Post {
+                $post = Post::create([
+                    'title'        => $data->title,
+                    'content'      => $data->content,
+                    'author_id'    => $data->authorId,
                     'is_published' => false,
                 ]);
+
+                // Eager-load author to prevent N+1 on the returned resource
+                return $post->load('author');
             });
         }
     }
 }
 
 namespace App\Http\Controllers {
-    use App\Models\Post;
     use App\Actions\CreatePostAction;
+    use App\DTOs\CreatePostData;
     use App\Http\Requests\StorePostRequest;
     use App\Http\Resources\PostResource;
+    use App\Models\Post;
     use Illuminate\Http\JsonResponse;
     use Illuminate\Routing\Controller;
 
     /**
-     * Example Laravel Controller demonstrating senior-level practices:
-     * - Native PHP 8+ type declarations (properties, parameters, return types).
-     * - Thin controllers delegating domain logic to Action classes.
-     * - Request validation using Form Requests and formatting via API Resources.
-     * - Eager loading relationships (`with('author')`) to eliminate N+1 queries.
-     * - No runtime 'strict_types' declaration per project guidelines.
+     * Laravel 11 thin controller: validate → DTO → Action → Resource.
+     * No business logic here — only input mapping and response shaping.
      */
     class PostController extends Controller
     {
-        /**
-         * Fetch paginated posts with author relation preloaded.
-         */
+        public function __construct(private readonly CreatePostAction $createPostAction) {}
+
         public function index(): JsonResponse
         {
-            // Eager load 'author' to prevent N+1 query bottleneck
             $posts = Post::with('author')
                 ->where('is_published', true)
-                ->orderBy('created_at', 'desc')
+                ->latest()
                 ->paginate(15);
 
             return response()->json([
-                'success' => true,
                 'data' => PostResource::collection($posts),
-            ], 200);
+                'meta' => [
+                    'total'        => $posts->total(),
+                    'current_page' => $posts->currentPage(),
+                    'last_page'    => $posts->lastPage(),
+                ],
+            ]);
         }
 
-        /**
-         * Create a new post delegating to StorePostRequest and CreatePostAction.
-         */
-        public function store(StorePostRequest $request, CreatePostAction $action): JsonResponse
+        public function store(StorePostRequest $request): JsonResponse
         {
-            try {
-                // Form Request guarantees array data is validated
-                $post = $action->execute($request->validated());
+            $post = $this->createPostAction->execute(
+                CreatePostData::fromRequest($request)
+            );
 
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Post created successfully.',
-                    'data' => new PostResource($post),
-                ], 201);
-            } catch (\Throwable $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to create post.',
-                    'error' => $e->getMessage(),
-                ], 500);
-            }
+            return response()->json([
+                'message' => 'Post created.',
+                'data'    => new PostResource($post),
+            ], 201);
         }
     }
 }

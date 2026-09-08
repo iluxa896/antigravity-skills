@@ -1,7 +1,6 @@
-version: '3.8'
-
 # Universal Production Docker Compose Template
 # Scalable, resource-bounded, non-root, log-capped setup
+# Note: `version` key is obsolete in Docker Compose v2+ (schema auto-detected)
 
 x-logging: &default-logging
   driver: "json-file"
@@ -19,7 +18,7 @@ networks:
 services:
   # Reverse Proxy / Web Server
   proxy:
-    image: nginx:1.25-alpine
+    image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
       - "80:80"
@@ -104,7 +103,7 @@ services:
 
   # In-Memory Cache Service
   cache:
-    image: redis:7-alpine
+    image: redis:8-alpine
     restart: unless-stopped
     logging: *default-logging
     networks:

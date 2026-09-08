@@ -123,7 +123,7 @@ function lintDockerCompose(filePath) {
   const issues = [];
 
   // Check 1: Log rotation & size capping
-  const hasLogging = /(max-size|max_size|x-logging-defaults)/i.test(content);
+  const hasLogging = /(max-size|max_size|x-logging|default-logging)/i.test(content);
   if (!hasLogging) {
     issues.push({
       file: relPath,

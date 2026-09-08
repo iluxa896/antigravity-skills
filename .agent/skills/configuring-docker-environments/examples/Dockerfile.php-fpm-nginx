@@ -1,11 +1,11 @@
 # ==============================================================================
-# Enterprise Multi-Stage Dockerfile: PHP 8.3-FPM + Nginx (Hardened Production)
+# Enterprise Multi-Stage Dockerfile: PHP 8.4-FPM + Nginx (Hardened Production)
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
 # Stage 1: Build & Composer Dependency Resolution
 # ------------------------------------------------------------------------------
-FROM php:8.3-cli-alpine AS vendor-builder
+FROM php:8.4-cli-alpine AS vendor-builder
 WORKDIR /build
 
 # Install system build dependencies and unzip
@@ -39,7 +39,7 @@ RUN composer install \
 # ------------------------------------------------------------------------------
 # Stage 2: Hardened Production Runtime (PHP-FPM + Nginx)
 # ------------------------------------------------------------------------------
-FROM php:8.3-fpm-alpine AS runner
+FROM php:8.4-fpm-alpine AS runner
 WORKDIR /var/www/html
 
 # Install runtime packages: Nginx, Tini init process, and runtime libraries

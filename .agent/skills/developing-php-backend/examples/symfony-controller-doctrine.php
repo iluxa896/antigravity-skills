@@ -4,41 +4,35 @@ namespace App\Dto {
     use Symfony\Component\Validator\Constraints as Assert;
 
     /**
-     * Data Transfer Object for Post creation with validation attributes.
+     * Immutable DTO using PHP 8.1 readonly constructor promotion + Attribute validation.
      */
-    class CreatePostDto
+    readonly class CreatePostDto
     {
-        #[Assert\NotBlank(message: 'Title must not be blank.')]
-        #[Assert\Length(max: 255, maxMessage: 'Title cannot exceed 255 characters.')]
-        public string $title;
+        public function __construct(
+            #[Assert\NotBlank(message: 'Title must not be blank.')]
+            #[Assert\Length(max: 255, maxMessage: 'Title cannot exceed 255 characters.')]
+            public string $title,
 
-        #[Assert\NotBlank(message: 'Content must not be blank.')]
-        public string $content;
-
-        public function __construct(string $title, string $content)
-        {
-            $this->title = $title;
-            $this->content = $content;
-        }
+            #[Assert\NotBlank(message: 'Content must not be blank.')]
+            public string $content,
+        ) {}
     }
 }
 
 namespace App\Service {
-    use App\Entity\Post;
     use App\Dto\CreatePostDto;
+    use App\Entity\Post;
     use Doctrine\ORM\EntityManagerInterface;
 
     /**
-     * Service class handling Post domain persistence logic.
+     * Domain service responsible for Post persistence.
+     * Uses readonly constructor promotion (PHP 8.1) for clean DI.
      */
     class PostService
     {
-        private EntityManagerInterface $entityManager;
-
-        public function __construct(EntityManagerInterface $entityManager)
-        {
-            $this->entityManager = $entityManager;
-        }
+        public function __construct(
+            private readonly EntityManagerInterface $em,
+        ) {}
 
         public function createPost(CreatePostDto $dto): Post
         {
@@ -48,15 +42,17 @@ namespace App\Service {
             $post->setIsPublished(false);
             $post->setCreatedAt(new \DateTimeImmutable());
 
-            $this->entityManager->persist($post);
-            $this->entityManager->flush();
+            $this->em->persist($post);
+            $this->em->flush();
 
             return $post;
         }
 
+        /** @return Post[] */
         public function getPublishedPosts(): array
         {
-            return $this->entityManager->createQueryBuilder()
+            // JOIN FETCH on author prevents N+1 queries
+            return $this->em->createQueryBuilder()
                 ->select('p', 'a')
                 ->from(Post::class, 'p')
                 ->leftJoin('p.author', 'a')
@@ -75,97 +71,60 @@ namespace App\Controller {
     use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
     use Symfony\Component\HttpFoundation\JsonResponse;
     use Symfony\Component\HttpFoundation\Request;
-    use Symfony\Component\Routing\Annotation\Route;
+    use Symfony\Component\Routing\Attribute\Route;
     use Symfony\Component\Validator\Validator\ValidatorInterface;
 
     /**
-     * Example Symfony Controller demonstrating senior-level practices:
-     * - Thin controllers delegating persistence to dedicated Service classes.
-     * - DTO deserialization and validation using PHP 8 Attributes.
-     * - Constructor dependency injection for autowired services.
-     * - Doctrine QueryBuilder join fetching to prevent N+1 queries.
-     * - Explicit native PHP 8+ type declarations without runtime strict_types.
+     * Symfony 7 thin controller: deserialize → validate → service → respond.
+     * Uses #[Route] attribute (Symfony 6.2+) and readonly constructor promotion.
      */
+    #[Route('/api/posts')]
     class PostController extends AbstractController
     {
-        private PostService $postService;
+        public function __construct(
+            private readonly PostService $postService,
+        ) {}
 
-        public function __construct(PostService $postService)
-        {
-            $this->postService = $postService;
-        }
-
-        /**
-         * Fetch published posts endpoint.
-         */
-        #[Route('/api/posts', name: 'app_posts_index', methods: ['GET'])]
+        #[Route('', name: 'app_posts_index', methods: ['GET'])]
         public function index(): JsonResponse
         {
             $posts = $this->postService->getPublishedPosts();
 
-            $data = array_map(static function ($post): array {
-                return [
-                    'id' => $post->getId(),
-                    'title' => $post->getTitle(),
-                    'content' => $post->getContent(),
-                    'author' => $post->getAuthor() ? [
-                        'id' => $post->getAuthor()->getId(),
-                        'name' => $post->getAuthor()->getName(),
-                    ] : null,
-                    'createdAt' => $post->getCreatedAt()?->format(\DateTimeInterface::ATOM),
-                ];
-            }, $posts);
+            $data = array_map(static fn($post): array => [
+                'id'        => $post->getId(),
+                'title'     => $post->getTitle(),
+                'author'    => $post->getAuthor()?->getName(),
+                'createdAt' => $post->getCreatedAt()?->format(\DateTimeInterface::ATOM),
+            ], $posts);
 
-            return $this->json([
-                'success' => true,
-                'data' => $data,
-            ]);
+            return $this->json(['data' => $data]);
         }
 
-        /**
-         * Create post endpoint.
-         */
-        #[Route('/api/posts', name: 'app_posts_create', methods: ['POST'])]
+        #[Route('', name: 'app_posts_create', methods: ['POST'])]
         public function create(Request $request, ValidatorInterface $validator): JsonResponse
         {
-            $payload = json_decode($request->getContent(), true) ?? [];
+            $payload = json_decode($request->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
             $dto = new CreatePostDto(
-                (string) ($payload['title'] ?? ''),
-                (string) ($payload['content'] ?? '')
+                title:   (string) ($payload['title'] ?? ''),
+                content: (string) ($payload['content'] ?? ''),
             );
 
             $violations = $validator->validate($dto);
-
             if (count($violations) > 0) {
                 $errors = [];
-                foreach ($violations as $violation) {
-                    $errors[$violation->getPropertyPath()] = $violation->getMessage();
+                foreach ($violations as $v) {
+                    $errors[$v->getPropertyPath()] = $v->getMessage();
                 }
-                return $this->json([
-                    'success' => false,
-                    'errors' => $errors,
-                ], 400);
+                return $this->json(['errors' => $errors], 422);
             }
 
-            try {
-                $post = $this->postService->createPost($dto);
+            $post = $this->postService->createPost($dto);
 
-                return $this->json([
-                    'success' => true,
-                    'message' => 'Post created successfully.',
-                    'data' => [
-                        'id' => $post->getId(),
-                        'title' => $post->getTitle(),
-                    ],
-                ], 201);
-            } catch (\Throwable $e) {
-                return $this->json([
-                    'success' => false,
-                    'message' => 'Failed to create post.',
-                    'error' => $e->getMessage(),
-                ], 500);
-            }
+            return $this->json([
+                'message' => 'Post created.',
+                'data'    => ['id' => $post->getId(), 'title' => $post->getTitle()],
+            ], 201);
         }
     }
 }

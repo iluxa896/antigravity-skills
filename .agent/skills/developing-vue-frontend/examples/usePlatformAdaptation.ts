@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, type Ref } from 'vue';
 
 export type OperatingSystem = 'ios' | 'android' | 'macos' | 'windows' | 'linux' | 'unknown';
 
@@ -132,12 +132,12 @@ export function usePlatformAdaptation() {
     const isMac = platform.value.isMacOS;
     const parts: string[] = [];
 
-    if (options.alt) parts.push(isMac ? '⌥' : 'Alt+');
+    if (options.alt)   parts.push(isMac ? '⌥' : 'Alt+');
     if (options.shift) parts.push(isMac ? '⇧' : 'Shift+');
     parts.push(isMac ? '⌘' : 'Ctrl+');
     parts.push(key.toUpperCase());
 
-    return isMac ? parts.join('') : parts.join('');
+    return parts.join('');
   }
 
   // 4. Check if shortcut event matches platform modifier
@@ -159,6 +159,8 @@ export function usePlatformAdaptation() {
  *
  * Ensures pressing the Android back button (or browser back swipe) closes an open
  * modal or drawer instead of navigating away from the current page.
+ *
+ * Automatically watches isOpen — no manual syncHistoryOnOpen call needed.
  */
 export function useAndroidBackModalSync(isOpen: Ref<boolean>, onClose: () => void) {
   if (typeof window === 'undefined') return;
@@ -172,8 +174,21 @@ export function useAndroidBackModalSync(isOpen: Ref<boolean>, onClose: () => voi
     }
   };
 
+  // Automatically push history entry when modal opens so Android back = close, not navigate
+  watch(isOpen, (open) => {
+    if (open && !statePushed) {
+      statePushed = true;
+      history.pushState({ modalOpen: true }, '', window.location.href);
+    }
+  });
+
   onMounted(() => {
     window.addEventListener('popstate', handlePopState);
+    // Sync immediately if modal is already open when composable mounts
+    if (isOpen.value && !statePushed) {
+      statePushed = true;
+      history.pushState({ modalOpen: true }, '', window.location.href);
+    }
   });
 
   onUnmounted(() => {
@@ -182,16 +197,4 @@ export function useAndroidBackModalSync(isOpen: Ref<boolean>, onClose: () => voi
       history.back();
     }
   });
-
-  // Sync history state when modal opens
-  const syncHistoryOnOpen = () => {
-    if (isOpen.value && !statePushed) {
-      statePushed = true;
-      history.pushState({ modalOpen: true }, '', window.location.href);
-    }
-  };
-
-  return {
-    syncHistoryOnOpen,
-  };
 }

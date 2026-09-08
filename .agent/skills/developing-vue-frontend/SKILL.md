@@ -128,17 +128,7 @@ Every component and layout MUST be validated against all four target platforms. 
 
 ---
 
-## 4. Automated Vue Quality Verification
-
-Run the built-in auditor across components to verify security, TypeScript, accessibility, Radix Vue usage, and cross-platform safety:
-
-```bash
-node .agent/skills/developing-vue-frontend/scripts/vue-audit-tool.mjs --path src/ --strict
-```
-
----
-
-## 5. Supporting Resources & Examples
+## 4. Supporting Resources & Examples
 
 - **Radix Vue Dialog Example**: [radix-dialog-example.vue](./examples/radix-dialog-example.vue) — Production dialog built on Radix Vue `DialogRoot` with native scroll lock, safe-area insets, Android back sync, and `@supports` backdrop-filter fallback.
 - **Platform Adaptation Composable**: [usePlatformAdaptation.ts](./examples/usePlatformAdaptation.ts) — TypeScript composable for OS detection, visual viewport tracking, shortcut formatting (⌘ vs Ctrl), and Android back-button modal sync.

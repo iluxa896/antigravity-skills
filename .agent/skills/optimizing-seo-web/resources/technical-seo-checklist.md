@@ -23,10 +23,10 @@ This reference guide provides senior technical rules, indexing validation steps,
 ## 2. On-Page HTML5 & Information Architecture
 
 ### Heading Hierarchy & Content Semantics
-- [ ] Exactly one `<h1\>` per page matching the page's primary search intent.
+- [ ] Exactly one `<h1>` per page matching the page's primary search intent.
 - [ ] Logical heading hierarchy (`h1` -> `h2` -> `h3`); never skip levels for styling purposes.
-- [ ] Wrap navigation links in `<nav\>`, main body in `<main\>`, sidebar in `<aside\>`, and footers in `<footer\>`.
-- [ ] All internal hyperlinks use `<a href="/path"\>` with keyword-descriptive anchor text.
+- [ ] Wrap navigation links in `<nav>`, main body in `<main>`, sidebar in `<aside>`, and footers in `<footer>`.
+- [ ] All internal hyperlinks use `<a href="/path">` with keyword-descriptive anchor text.
 
 ### Canonicalization & Duplicate Management
 - [ ] Every indexable page contains a self-referencing canonical tag: `<link rel="canonical" href="https://example.com/canonical-url">`.
@@ -55,11 +55,13 @@ This reference guide provides senior technical rules, indexing validation steps,
 
 ---
 
-## 4. Core Web Vitals Optimization Benchmarks
+## 4. Core Web Vitals
 
-| Metric | Target (Good) | Primary Bottlenecks & Fixes |
-| :--- | :--- | :--- |
-| **LCP** (Largest Contentful Paint) | **< 2.5s** | Preload hero banner (`<link rel="preload" as="image">`), server caching, CDN edge delivery, TTFB < 800ms. |
-| **INP** (Interaction to Next Paint) | **< 200ms** | Break long JavaScript execution tasks into microtasks (`requestAnimationFrame`, Web Workers, debounced handlers). |
-| **CLS** (Cumulative Layout Shift) | **< 0.1** | Explicit `width` and `height` (or `aspect-ratio`) on images, videos, ads, and embeds. Reserve skeleton placeholders for dynamic widgets. |
-| **TTFB** (Time to First Byte) | **< 800ms** | OPcache preloading, Redis page cache, optimized database queries, geo-distributed CDN caching. |
+See thresholds and optimization tactics in [technical-seo-architecture.md](../references/technical-seo-architecture.md#2-core-web-vitals-cwv-engineering-guidelines).
+
+| Metric | Target |
+| :--- | :--- |
+| **LCP** | < 2.5s — preload hero image, TTFB < 800ms, CDN edge |
+| **INP** | < 200ms — break long tasks, defer non-critical JS |
+| **CLS** | < 0.1 — explicit width/height on all media |
+| **TTFB** | < 800ms — OPcache, Redis page cache, geo CDN |
