@@ -68,50 +68,81 @@ function parseArgs(args) {
   return options;
 }
 
+function classifyDockerfile(filePath, content) {
+  const lowerPath = filePath.toLowerCase().replace(/\\/g, '/');
+  const baseName = path.basename(filePath).toLowerCase();
+
+  const isInit = baseName.endsWith('.init') ||
+                 baseName.includes('migrate') ||
+                 baseName.includes('seed') ||
+                 lowerPath.includes('/init/') ||
+                 /init\.sh/i.test(content) ||
+                 /generate\b.*>.*users\.ya?ml/i.test(content);
+
+  const isProxy = /^FROM\s+([^\s:]*\/)?(nginx|caddy|traefik|envoy|haproxy)/im.test(content) ||
+                  lowerPath.includes('/nginx/') ||
+                  lowerPath.includes('/caddy/') ||
+                  lowerPath.includes('/traefik/');
+
+  if (isInit) return 'EPHEMERAL_INIT';
+  if (isProxy) return 'EDGE_GATEWAY';
+  return 'APP_RUNTIME';
+}
+
 function lintDockerfile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
   const relPath = path.relative(process.cwd(), filePath);
   const issues = [];
+  const archetype = classifyDockerfile(filePath, content);
 
-  // Check 1: Non-root user
-  if (!/^\s*USER\s+[a-zA-Z0-9_-]+/m.test(content)) {
-    issues.push({
-      file: relPath,
-      severity: 'ERROR',
-      rule: 'DOCKER-NO-ROOT',
-      message: 'Dockerfile executes as default root user. Add a non-root user (e.g. USER 10001:10001).',
-    });
+  // Check 1: Non-root user (Mandatory for App Runtimes; Gateways drop privileges internally; Inits run to completion)
+  const hasUser = /^\s*USER\s+[a-zA-Z0-9_-]+/m.test(content);
+  if (!hasUser) {
+    if (archetype === 'APP_RUNTIME') {
+      issues.push({
+        file: relPath,
+        severity: 'ERROR',
+        rule: 'DOCKER-NO-ROOT',
+        message: 'Application runtime executes as default root user. Add a non-root user (e.g. USER 10001:10001).',
+      });
+    }
   }
 
-  // Check 2: Multi-stage build
+  // Check 2: Multi-stage build (Mandatory for App Runtimes to isolate compilers; not required for single-purpose proxies or init scripts)
   const fromMatches = content.match(/^\s*FROM\s+/gim);
   if (!fromMatches || fromMatches.length < 2) {
-    issues.push({
-      file: relPath,
-      severity: 'WARNING',
-      rule: 'DOCKER-SINGLE-STAGE',
-      message: 'Dockerfile is single-stage. Use multi-stage builds to isolate build tools from production images.',
-    });
+    if (archetype === 'APP_RUNTIME') {
+      issues.push({
+        file: relPath,
+        severity: 'WARNING',
+        rule: 'DOCKER-SINGLE-STAGE',
+        message: 'Application runtime is single-stage. Use multi-stage builds to isolate build tools from production images.',
+      });
+    }
   }
 
-  // Check 3: Init system
+  // Check 3: Init system (Mandatory for App Runtimes; Gateways supervise workers internally; Inits execute simple shell scripts)
   if (!/(tini|dumb-init)/i.test(content)) {
-    issues.push({
-      file: relPath,
-      severity: 'WARNING',
-      rule: 'DOCKER-NO-INIT',
-      message: 'No init process detected (tini or dumb-init). Direct node/app commands may fail to reap zombies or catch SIGTERM.',
-    });
+    if (archetype === 'APP_RUNTIME') {
+      issues.push({
+        file: relPath,
+        severity: 'WARNING',
+        rule: 'DOCKER-NO-INIT',
+        message: 'No init process detected (tini or dumb-init). Direct node/app commands may fail to reap zombies or catch SIGTERM.',
+      });
+    }
   }
 
-  // Check 4: Healthcheck
+  // Check 4: Healthcheck (Mandatory for App Runtimes; FORBIDDEN on Ephemeral Inits as it breaks compose completion; Compose-level for Proxies)
   if (!/^\s*HEALTHCHECK\s+/im.test(content)) {
-    issues.push({
-      file: relPath,
-      severity: 'WARNING',
-      rule: 'DOCKER-NO-HEALTHCHECK',
-      message: 'No HEALTHCHECK instruction declared in Dockerfile.',
-    });
+    if (archetype === 'APP_RUNTIME') {
+      issues.push({
+        file: relPath,
+        severity: 'WARNING',
+        rule: 'DOCKER-NO-HEALTHCHECK',
+        message: 'No HEALTHCHECK instruction declared in application Dockerfile.',
+      });
+    }
   }
 
   return issues;
@@ -133,14 +164,14 @@ function lintDockerCompose(filePath) {
     });
   }
 
-  // Check 2: Healthcheck or depends_on condition
-  const hasHealth = /(healthcheck:|condition:\s*service_healthy)/i.test(content);
+  // Check 2: Healthcheck or dependency ordering (service_healthy or service_completed_successfully)
+  const hasHealth = /(healthcheck:|condition:\s*(service_healthy|service_completed_successfully))/i.test(content);
   if (!hasHealth) {
     issues.push({
       file: relPath,
       severity: 'WARNING',
       rule: 'COMPOSE-NO-HEALTHCHECK',
-      message: 'Compose services lack healthchecks or dependency ordering (condition: service_healthy).',
+      message: 'Compose services lack healthchecks or dependency ordering (condition: service_healthy / service_completed_successfully).',
     });
   }
 
@@ -157,6 +188,7 @@ function lintDockerCompose(filePath) {
 
   return issues;
 }
+
 
 function collectDockerTargets(dirPath, targets = { dockerfiles: [], composeFiles: [] }) {
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });

@@ -74,10 +74,11 @@ function auditHtmlFile(filePath) {
   const issues = [];
 
   const isFullHtml = /<html/i.test(content) || /<!DOCTYPE html>/i.test(content);
+  const isSpaShell = /@inertia|\bid=["']app["']/i.test(content);
 
   // Check 1: Single <h1> hierarchy
   const h1Matches = content.match(/<h1\b[^>]*>(.*?)<\/h1>/gis) || [];
-  if (isFullHtml && h1Matches.length === 0) {
+  if (isFullHtml && !isSpaShell && h1Matches.length === 0) {
     issues.push({
       file: relPath,
       severity: 'ERROR',
@@ -117,7 +118,8 @@ function auditHtmlFile(filePath) {
       });
     } else {
       const titleText = titleMatch[1].trim();
-      if (titleText.length < 25 || titleText.length > 65) {
+      const isDynamic = /\{\{|\$|%|<%/.test(titleText);
+      if (!isDynamic && (titleText.length < 25 || titleText.length > 65)) {
         issues.push({
           file: relPath,
           severity: 'WARNING',
@@ -138,7 +140,8 @@ function auditHtmlFile(filePath) {
       });
     } else {
       const descText = descMatch[1].trim();
-      if (descText.length < 80 || descText.length > 165) {
+      const isDynamic = /\{\{|\$|%|<%/.test(descText);
+      if (!isDynamic && (descText.length < 80 || descText.length > 165)) {
         issues.push({
           file: relPath,
           severity: 'WARNING',
@@ -162,6 +165,12 @@ function auditHtmlFile(filePath) {
   return issues;
 }
 
+const TEMPLATE_EXTENSIONS = ['.html', '.vue', '.blade.php'];
+
+function isTemplateFile(filename) {
+  return TEMPLATE_EXTENSIONS.some(ext => filename.endsWith(ext));
+}
+
 function collectFiles(dirPath, fileList = []) {
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
 
@@ -172,7 +181,7 @@ function collectFiles(dirPath, fileList = []) {
         continue;
       }
       collectFiles(fullPath, fileList);
-    } else if (entry.isFile() && (entry.name.endsWith('.html') || entry.name.endsWith('.vue'))) {
+    } else if (entry.isFile() && isTemplateFile(entry.name)) {
       fileList.push(fullPath);
     }
   }
@@ -194,7 +203,7 @@ function run() {
 
   if (stat.isDirectory()) {
     files = collectFiles(resolvedTarget);
-  } else if (resolvedTarget.endsWith('.html') || resolvedTarget.endsWith('.vue')) {
+  } else if (isTemplateFile(resolvedTarget)) {
     files = [resolvedTarget];
   }
 

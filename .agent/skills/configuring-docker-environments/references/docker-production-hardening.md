@@ -76,3 +76,25 @@ deploy:
 | **`environment:` in compose** | Poor | Visible via `docker inspect`, leaked in crash dumps/child processes | Development only |
 | **`.env` files** | Moderate | Prone to accidental Git commits | Exclude in `.gitignore` & `.dockerignore` |
 | **Docker Secrets (`/run/secrets`)** | Enterprise | Mounted as in-memory files in `tmpfs`, unreadable outside container | **Production Standard** |
+
+---
+
+## 6. Container Role Alignment & Node.js V8 Memory Quotas
+
+### Role Alignment (Pragmatic Hardening)
+- **App Runtimes (Node, PHP-FPM, Python, Go)**: Enforce strict `USER 10001:10001`, multi-stage builds, `tini` signal handling, and healthchecks.
+- **Edge Gateways (Nginx, Traefik)**: Allow master to start as `root` for low port binding (80/443) and Certbot cron; workers drop to unprivileged `nginx:nginx`. Do not wrap Nginx in `tini` (Nginx is its own signal supervisor).
+- **Ephemeral Inits (`*.init`, `migrate`)**: Single-stage, run-to-completion (`service_completed_successfully`). **Never attach a HEALTHCHECK** to an ephemeral container.
+
+### Node.js / V8 Heap Management
+V8's default heap limit is approximately 1.4 GB (64-bit) or 700 MB (32-bit), but inside cgroups it may fail to adjust before hit by the Linux OOM-killer or fail prematurely during Vite/Webpack production builds:
+```bash
+# Allocate explicit heap limit matching container memory quota:
+NODE_OPTIONS="--max-old-space-size=2048" npm run build
+```
+In Docker Compose:
+```yaml
+environment:
+  - NODE_OPTIONS=--max-old-space-size=2048
+```
+

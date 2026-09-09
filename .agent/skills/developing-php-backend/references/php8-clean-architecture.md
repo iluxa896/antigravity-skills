@@ -107,6 +107,25 @@ opcache.interned_strings_buffer=16
 opcache.max_accelerated_files=20000
 opcache.validate_timestamps=0
 opcache.preload=/var/www/html/preload.php
-opcache.preload_user=appuser
-```
 Preloading compiles framework classes into shared memory before handling HTTP requests, reducing request overhead to near zero.
+
+---
+
+## 5. Command-Query Separation (CQS) & DTO Pragmatism
+
+A senior software engineer avoids layer proliferation and cargo-cult abstractions:
+
+### Query Side (Reads from Database)
+- **Direct Eloquent Execution**: For standard reads (catalog listings, item details, admin tables), controllers should directly invoke Eloquent scopes or thin Query Services:
+  ```php
+  $cards = Card::published()->with(['category', 'tags'])->paginate(15);
+  ```
+- **Why NOT DTO on simple reads**: Eloquent models in Laravel 11 are strongly typed via `casts()`, BackedEnums, and PHPDoc generics (`Collection<int, Card>`). Mapping simple reads to DTOs causes double object allocation in memory, increases GC pressure, breaks pagination `LengthAwarePaginator`, and violates DRY.
+- **When DTOs ARE used for Reads**:
+  - Multi-source aggregations (e.g. `SeoMetadataDto` combining configs, models, and JSON-LD).
+  - External 3rd-party API responses (CDEK, YooKassa, Telegram).
+  - Analytical reports without a single backing model.
+
+### Command Side (Writes / Mutations)
+- **Full Domain Protection**: User input is untrusted. Use `FormRequest` for validation, map to a typed DTO (`final readonly class`), and execute through an Action / Domain Service inside `DB::transaction()`.
+

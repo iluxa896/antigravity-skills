@@ -4,6 +4,16 @@ This resource defines the rigorous QA testing procedures, boundary attack vector
 
 ---
 
+## 0. Test Pyramid & Pragmatic Architecture Checklist
+
+- [ ] **Pyramid Distribution**: ~70% Fast Unit & HTTP Feature Tests (PHPUnit / Vitest), ~20% Component Tests, ~10% Resilient E2E (Playwright).
+- [ ] **No E2E Bloat**: Never test every individual validation rule or minor error state through heavy browser automation. Reserve Playwright for mission-critical multi-step user journeys (Auth, Checkout, Upload).
+- [ ] **Framework-Native DB Testing**: Use native framework tools (`RefreshDatabase`, factories, transactions) instead of synthetic in-file mock database connections.
+- [ ] **Resilient Selectors**: Strictly use `getByRole` or `data-testid` in browser tests. Zero fragile CSS class selectors.
+- [ ] **Zero Arbitrary Sleep**: Use auto-waiting assertions (`toBeVisible()`) instead of `page.waitForTimeout()` or `sleep()`.
+
+---
+
 ## 1. Functional & Boundary Value Test Matrix
 
 ### Boundary Value Analysis (BVA)

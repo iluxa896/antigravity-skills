@@ -1,17 +1,28 @@
 <?php
 
+/**
+ * Enterprise Laravel 11 Clean Architecture & Controller Patterns
+ *
+ * Demonstrates:
+ * 1. Dual Transport Layer: Archetype A (Inertia Monolith) vs Archetype B (Headless REST API)
+ * 2. CQS Pragmatism: Simple reads directly via Eloquent scopes; DTO + Action strictly for transactional writes
+ * 3. FormRequest validation & Policy-based authorization
+ * 4. Readonly DTO with PHP 8.2 constructor promotion
+ * 5. Atomic DB::transaction encapsulation in Action classes
+ */
+
 namespace App\Http\Requests {
     use Illuminate\Foundation\Http\FormRequest;
     use Illuminate\Support\Facades\Gate;
 
     /**
-     * Form Request with Policy-based authorization and strict validation.
+     * Form Request with Policy-based authorization and strict validation rules.
      */
     class StorePostRequest extends FormRequest
     {
         public function authorize(): bool
         {
-            // Explicitly check policy — never blindly return true
+            // Explicitly verify policy permissions — never blindly return true
             return Gate::allows('create', \App\Models\Post::class);
         }
 
@@ -29,9 +40,10 @@ namespace App\Http\Requests {
 
 namespace App\DTOs {
     /**
-     * Readonly DTO using PHP 8.1 constructor promotion.
+     * Readonly DTO using PHP 8.2 constructor promotion.
+     * Used for Command/Write mutations to provide strongly-typed payloads to Domain Actions.
      */
-    readonly class CreatePostData
+    final readonly class CreatePostData
     {
         public function __construct(
             public string $title,
@@ -50,37 +62,15 @@ namespace App\DTOs {
     }
 }
 
-namespace App\Http\Resources {
-    use Illuminate\Http\Resources\Json\JsonResource;
-
-    class PostResource extends JsonResource
-    {
-        /** @return array<string, mixed> */
-        public function toArray(\Illuminate\Http\Request $request): array
-        {
-            return [
-                'id'         => $this->id,
-                'title'      => $this->title,
-                'content'    => $this->content,
-                'author'     => [
-                    'id'   => $this->author->id,
-                    'name' => $this->author->name,
-                ],
-                'created_at' => $this->created_at?->toIso8601String(),
-            ];
-        }
-    }
-}
-
 namespace App\Actions {
     use App\DTOs\CreatePostData;
     use App\Models\Post;
     use Illuminate\Support\Facades\DB;
 
     /**
-     * Single-responsibility Action: creates a Post inside an atomic transaction.
+     * Single-responsibility Action: creates a Post inside an atomic database transaction.
      */
-    class CreatePostAction
+    final readonly class CreatePostAction
     {
         public function execute(CreatePostData $data): Post
         {
@@ -92,14 +82,89 @@ namespace App\Actions {
                     'is_published' => false,
                 ]);
 
-                // Eager-load author to prevent N+1 on the returned resource
+                // Eager-load relation to prevent N+1 queries downstream
                 return $post->load('author');
             });
         }
     }
 }
 
-namespace App\Http\Controllers {
+namespace App\Http\Controllers\Inertia {
+    use App\Actions\CreatePostAction;
+    use App\DTOs\CreatePostData;
+    use App\Http\Requests\StorePostRequest;
+    use App\Models\Post;
+    use Illuminate\Http\RedirectResponse;
+    use Illuminate\Routing\Controller;
+    use Inertia\Inertia;
+    use Inertia\Response as InertiaResponse;
+
+    /**
+     * Archetype A: Full-Stack Inertia.js Monolith Controller
+     *
+     * Transport rules:
+     * - Reads: Return Inertia::render() directly using Eloquent scopes (CQS zero-overhead read).
+     * - Writes: Delegate to Action in DB::transaction, redirect back/to_route with flash messages.
+     * - Strict Rule: NEVER return response()->json() for standard Inertia page routes!
+     */
+    final class InertiaPostController extends Controller
+    {
+        public function __construct(
+            private readonly CreatePostAction $createPostAction,
+        ) {}
+
+        public function index(): InertiaResponse
+        {
+            // CQS Read Pragmatism: No redundant DTO layer for simple reads.
+            // Eloquent models provide native casts(), relations, and paginator mapping.
+            $posts = Post::with('author')
+                ->where('is_published', true)
+                ->latest()
+                ->paginate(15);
+
+            return Inertia::render('Posts/Index', [
+                'posts' => $posts,
+            ]);
+        }
+
+        public function store(StorePostRequest $request): RedirectResponse
+        {
+            $post = $this->createPostAction->execute(
+                CreatePostData::fromRequest($request)
+            );
+
+            return to_route('posts.show', $post->id)
+                ->with('success', 'Запись успешно создана.');
+        }
+    }
+}
+
+namespace App\Http\Resources {
+    use Illuminate\Http\Resources\Json\JsonResource;
+
+    /**
+     * API Resource for shaping public REST API payloads.
+     */
+    class PostResource extends JsonResource
+    {
+        /** @return array<string, mixed> */
+        public function toArray(\Illuminate\Http\Request $request): array
+        {
+            return [
+                'id'         => $this->id,
+                'title'      => $this->title,
+                'content'    => $this->content,
+                'author'     => [
+                    'id'   => $this->author?->id,
+                    'name' => $this->author?->name,
+                ],
+                'created_at' => $this->created_at?->toIso8601String(),
+            ];
+        }
+    }
+}
+
+namespace App\Http\Controllers\Api {
     use App\Actions\CreatePostAction;
     use App\DTOs\CreatePostData;
     use App\Http\Requests\StorePostRequest;
@@ -109,12 +174,17 @@ namespace App\Http\Controllers {
     use Illuminate\Routing\Controller;
 
     /**
-     * Laravel 11 thin controller: validate → DTO → Action → Resource.
-     * No business logic here — only input mapping and response shaping.
+     * Archetype B: Headless REST API Controller
+     *
+     * Transport rules:
+     * - Reads: Return JsonResponse shaped by JsonResource.
+     * - Writes: Return JsonResponse with HTTP 201 Created and resource payload.
      */
-    class PostController extends Controller
+    final class ApiPostController extends Controller
     {
-        public function __construct(private readonly CreatePostAction $createPostAction) {}
+        public function __construct(
+            private readonly CreatePostAction $createPostAction,
+        ) {}
 
         public function index(): JsonResponse
         {

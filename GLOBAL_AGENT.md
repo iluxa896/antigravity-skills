@@ -48,17 +48,17 @@ For non-trivial features and refactorings, track status in `roadmap.md` at the r
   [/] Actively in progress
   [x] Fully completed
 - RULE 3: PROGRESSIVE COMPACTION. If `roadmap.md` grows beyond ~50-70 lines:
-    - Collapse and consolidate completed historical milestones/phases into a concise summary section (e.g., `### Archive: Milestone 1 (Completed)` with 2–3 bullet points).
-    - Keep active and upcoming phases fully detailed with individual sub-tasks.
-    - Never discard pending tasks or unresolved blockers.
+  - Collapse and consolidate completed historical milestones/phases into a concise summary section (e.g., `### Archive: Milestone 1 (Completed)` with 2–3 bullet points).
+  - Keep active and upcoming phases fully detailed with individual sub-tasks.
+  - Never discard pending tasks or unresolved blockers.
 - RULE 4: TRIGGERS. Update status on task start ([/]), completion ([x]), or blocker discovery ([ ]). (Skip for pure Q&A).
 
 *** 3. DECISION & CHANGE LOGGING & COMPACTION (history.md) ***
 Log significant architecture decisions, fixes, and schema changes to `history.md`.
 - Ultra-Concise Entries: State Problem -> Solution -> Impacted modules in 2-3 bullet lines. No walls of text or raw code dumps.
 - CONTINUOUS COMPACTION: When `history.md` exceeds ~40 lines:
-    - Consolidate older, minor entries (>5-10 commits old) into a single high-level milestone summary (e.g., `* Milestone v1.0 Core Setup: [summary of completed features]`).
-    - Always preserve the latest 15–20 detailed entries and all critical architectural decisions.
+  - Consolidate older, minor entries (>5-10 commits old) into a single high-level milestone summary (e.g., `* Milestone v1.0 Core Setup: [summary of completed features]`).
+  - Always preserve the latest 15–20 detailed entries and all critical architectural decisions.
 
 *** 4. DEFINITION OF DONE & MANDATORY VERIFICATION (ANTI-CHEATING) ***
 - Production-Ready Only: No placeholders, dummy mocks, or unresolved "TODO" comments in final deliverables.
@@ -78,10 +78,18 @@ Log significant architecture decisions, fixes, and schema changes to `history.md
 - Follow rules defined in the project's root files (`GEMINI.md`, `AGENTS.md`, `project_rules.md` or `.agents/rules/`).
 - If an important architectural rule emerges, append it to the project's rule file to ensure future consistency.
 
-*** 8. CONTEXTUAL SKILL INVOCATION (.agent/skills) ***
-Step 1 - Progressive Selection: Identify the relevant skill folder from the system context.
-Step 2 - Instruction Loading: Read the main `SKILL.md` file first.
-Step 3 - PRAGMATIC EXTRACTION (Toolkit, Not Checklist):
-- Inspect the contents of the chosen skill's `examples/`, `resources/`, and `scripts/` directories.
-- Read relevant files for the current stack.
-- CRITICAL CONSTRAINT: Treat skill examples as a TOOLKIT for solving specific problems, NOT as a mandatory checklist to be blindly forced into working code. Apply patterns from skills ONLY when there is a clear, concrete problem in the existing code that requires them.
+*** 8. AUTONOMOUS SKILL DISCOVERY & PRAGMATIC INVOCATION ***
+The user will NEVER specify skill names in prompts. Autonomous skill discovery and invocation is strictly the agent's responsibility.
+Step 1 - Pre-Flight Intent Matching (Mandatory Gate):
+- Before planning, modifying, or creating any code, review the registered skills in the system context.
+- Match the user's intent, the technical domain, and the affected file extensions against the descriptions of all available skills.
+- If ANY registered skill covers the technology, framework, architecture, testing, or security aspects of the current task, you MUST invoke `view_file` on its `SKILL.md` before writing implementation code.
+- Never assume generic pre-trained knowledge overrides a registered skill; skills define project-specific standards, architectural guardrails, and platform edge-case defenses.
+
+Step 2 - Contextual Deep Dive:
+- If the loaded `SKILL.md` references specialized guides, checklists, or examples (`examples/`, `resources/`, `references/`) relevant to the current task, inspect them before coding.
+
+Step 3 - Pragmatic Extraction (Toolkit, Not Checklist):
+- CRITICAL CONSTRAINT: Treat skill contents as an architectural compass and problem-solving TOOLKIT, NOT as a mandatory compliance checklist to rewrite working code.
+- Apply patterns from skills ONLY to solve the concrete problem at hand.
+- If existing surrounding code is working predictably, securely, and cleanly: LEAVE IT ALONE (strict adherence to KISS & YAGNI).

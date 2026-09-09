@@ -11,8 +11,9 @@ Googlebot processes web pages in two distinct phases:
 2. **Web Rendering Service (WRS)**: The page enters a render queue where a headless Chromium instance executes JavaScript. This can delay indexation by days or weeks.
 
 ### Recommended Architectural Fixes:
+- **Server-First Monoliths (Inertia.js / Laravel)**: Render the complete `<head>`, OpenGraph, Twitter cards, and Schema.org JSON-LD scripts directly in `resources/views/app.blade.php` via server-side composers/services. Search bots and social media scrapers receive 100% complete metadata on the initial raw HTTP response with zero dependency on client JS execution.
 - **SSR (Server-Side Rendering)**: Render initial HTML on the server (Nuxt 3, Next.js, Nitro).
-- **Dynamic Prerendering / Hydration**: If using an SPA (Vue/React), detect search bot user agents (`Googlebot`, `Bingbot`, `YandexBot`) and serve pre-rendered static HTML via Prerender.io or server-side headless Chrome.
+- **Dynamic Prerendering / Hydration**: If using a client-only SPA (Vue/React), detect search bot user agents (`Googlebot`, `Bingbot`, `YandexBot`) and serve pre-rendered static HTML via Prerender.io or server-side headless Chrome.
 
 ---
 

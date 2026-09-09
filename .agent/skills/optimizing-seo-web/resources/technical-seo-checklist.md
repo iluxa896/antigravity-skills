@@ -4,6 +4,18 @@ This reference guide provides senior technical rules, indexing validation steps,
 
 ---
 
+## 0. Architectural Single Source of Truth (DRY SEO)
+
+- [ ] **Server-First Monoliths (Inertia.js / Laravel)**:
+  - Master layout template (`app.blade.php`) is the **single source of truth** for `<head>`, OpenGraph, Twitter cards, and Schema.org JSON-LD scripts.
+  - Social media bots (Telegram, VK, WhatsApp) and search engines receive 100% complete metadata in the raw initial HTTP response without waiting for JS execution.
+  - Vue components handle **strictly dynamic SPA tab title, description, and canonical URL** via `<Head>` on route changes.
+  - **Forbidden**: Do NOT duplicate JSON-LD schema generation inside Vue client components (DRY violation & bundle bloat).
+- [ ] **Standalone SPAs (Vite / Nuxt)**:
+  - Manage meta tags and JSON-LD via SSR / head composables (`useHead`).
+
+---
+
 ## 1. Crawlability & Indexation Infrastructure
 
 ### Robots Directives (`robots.txt` & Meta Tags)

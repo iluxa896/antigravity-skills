@@ -173,7 +173,7 @@ function auditVueFile(filePath, options = {}) {
     }
 
     // Check 9: Form inputs with font size < 16px (iOS Safari auto-zoom risk)
-    if (/<(?:input|select|textarea)\b[^>]*(?:text-xs|text-sm|font-size:\s*(?:1[0-4]px|0\.[78]rem))/i.test(content) && !/text-base|font-size:\s*16px/i.test(content)) {
+    if (/<(?:input|select|textarea)\b[^>]*(?:text-xs|text-sm|font-size:\s*(?:1[0-4]px|0\.[78]rem))/i.test(content) && !/text-base|text-\[16px\]|font-size:\s*16px/i.test(content)) {
         issues.push({
             file: relPath,
             severity: 'WARNING',

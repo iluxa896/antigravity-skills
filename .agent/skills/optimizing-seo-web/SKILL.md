@@ -19,66 +19,79 @@ description: >-
 
 ---
 
-## 1. Degrees of Freedom
+## 1. Architectural Paradigms (Server-First vs Client-First)
 
-| Level | Area | Constraints |
+Before implementing SEO tags or structured data, explicitly determine the application architecture:
+
+| Aspect | Archetype A: Server-First Monolith (Inertia.js / Laravel / Rails) | Archetype B: Standalone SPA / SSG (Nuxt / Next / Vite) |
 | :--- | :--- | :--- |
-| **High** | Content Strategy & Link Graph | Site taxonomy, topic clusters, keyword targeting, editorial structure. |
-| **Medium** | Schema Selection & Meta Copy | FAQ vs HowTo vs Article schema, meta description CTAs, sitemap priority weights. |
-| **Low** | Technical Directives | Exactly one `<h1>` per page, valid Schema.org JSON-LD, canonical syntax, standard robots.txt, HTTP 200/404. |
+| **Single Source of Truth** | Server-side template (`app.blade.php`). Fully rendered in the initial raw HTTP response. | Client / SSR head composables (`useHead`, `unhead`, `next/head`). |
+| **JSON-LD Structured Data** | Built and rendered on the server (e.g. `SeoSchemaBuilder` in PHP). Zero client JS bundle overhead. | Built in client/SSR composables via TypeScript helpers (`json-ld-schemas.ts`). |
+| **Social Previews (OpenGraph)** | Server-rendered in raw HTML. Guarantees instant previews in Telegram, VK, WhatsApp, Twitter. | Server-Side Rendered (SSR) or pre-rendered via Edge functions. |
+| **Client Component Role** | Vue `<Head>` updates strictly the dynamic browser tab title, description, and canonical URL on SPA navigation. | Component manages both meta tags and dynamic structured data insertion. |
+| **Anti-Pattern Warning** | **DO NOT** duplicate JSON-LD schema builders inside Vue components in an Inertia app (DRY violation & bundle bloat). | **DO NOT** rely on client-only JS rendering if social/search bots do not execute JavaScript. |
 
 ---
 
 ## 2. Core Technical SEO Principles
 
 ### Semantic HTML Architecture
-- **Single `<h1>`**: One per page, reflects primary search intent. Logical `h2 → h3 → h4` cascade, no skips.
-- **Semantic tags**: `<main>`, `<article>`, `<section>`, `<nav>`, `<aside>`, `<header>`, `<footer>` — no `<div>` soup.
-- **Links**: Standard `<a href="...">` with descriptive anchor text. Never `<button @click="navigate()">`.
-- **Images**: Meaningful `alt` on informative images, `alt=""` on decorative. Explicit `width`/`height`. Use `.webp`/`.avif` + `loading="lazy"`.
+- **Single `<h1>`**: Exactly one per page, reflecting primary search intent. Logical `h2 → h3 → h4` cascade, no skips.
+- **Semantic Tags**: `<main>`, `<article>`, `<section>`, `<nav>`, `<aside>`, `<header>`, `<footer>` — eliminate unnecessary `<div>` soup.
+- **Crawlable Hyperlinks**: Use standard `<a href="...">` with descriptive anchor text. Never use `<button @click="navigate()">` for navigation (search spiders cannot follow JavaScript click events).
+- **Images**: Meaningful `alt` on informative images, `alt=""` on decorative graphics. Explicit `width`/`height` (prevent CLS). Use modern formats (`.webp`/`.avif`) + native `loading="lazy"`.
 
 ### JSON-LD Structured Data
 Embed via `<script type="application/ld+json">`. Core schemas:
 - **Organization / WebSite**: brand entity, logo, `searchAction` template.
-- **BreadcrumbList**: hierarchical path.
+- **BreadcrumbList**: hierarchical navigation path matching site breadcrumbs.
+- **Product / Offer**: name, SKU, price, currency, availability (`InStock`/`OutOfStock`), ratings.
 - **Article / BlogPosting**: headline, author, `datePublished`, `dateModified`, image.
-- **Product / Offer**: name, SKU, price, currency, availability, `aggregateRating`.
-- **FAQPage**: Question/Answer pairs for rich snippet expansion.
+- **FAQPage**: Question/Answer pairs for rich search snippet expansion.
 
 ### Meta Tags & Social Previews
-- **Title**: 50–60 chars. Format: `Primary Keyword – Benefit | Brand`.
-- **Meta description**: 120–155 chars, clear CTA.
-- **Canonical**: `<link rel="canonical" href="https://example.com/clean-path">` on every page.
-- **OpenGraph**: `og:title`, `og:description`, `og:image` (1200×630px), `og:url`, `og:type`.
+- **Title Tag**: 50–60 characters. Format: `Primary Keyword – Benefit | Brand`.
+- **Meta Description**: 120–155 characters, clear value proposition and call-to-action.
+- **Canonical URL**: `<link rel="canonical" href="https://example.com/clean-path">` on every crawlable page to prevent duplicate content penalties.
+- **OpenGraph**: `og:title`, `og:description`, `og:image` (1200×630px raster, <300 KB), `og:url`, `og:type`.
 - **X (Twitter)**: `twitter:card` (`summary_large_image`), `twitter:title`, `twitter:description`, `twitter:image`.
 
 ---
 
-## 3. Audit Workflow
+## 3. Core Web Vitals Optimization
+
+| Metric | Target Threshold | Primary Engineering Levers |
+| :--- | :--- | :--- |
+| **LCP** (Largest Contentful Paint) | $< 2.5\text{s}$ | Preload hero banner (`<link rel="preload" as="image">`), optimize TTFB via server caching, serve WebP/AVIF. |
+| **INP** (Interaction to Next Paint) | $< 200\text{ms}$ | Offload heavy processing (e.g. image compression) to Web Workers, break long main-thread JS tasks ($> 50\text{ms}$). |
+| **CLS** (Cumulative Layout Shift) | $< 0.1$ | Explicit `width`/`height` on images and media containers, `scrollbar-gutter: stable`, reserve space for dynamic widgets. |
+
+---
+
+## 4. Audit Workflow
 
 ```
-[ ] 1. Crawlability & Rendering
-      – robots.txt must NOT block JS/CSS assets.
-      – HTTP 200 for valid pages, HTTP 404/410 for missing pages.
-      – Core content and links present in initial HTML (no JS-only render for critical text).
-[ ] 2. On-Page & Semantic Audit
-      – node .agent/skills/optimizing-seo-web/scripts/seo-audit-linter.mjs --path public/
-      – Check H1-H6 hierarchy, title/description lengths, canonical consistency, alt tags.
-[ ] 3. Structured Data Validation
-      – Validate JSON-LD via Google Rich Results Test.
-      – Verify BreadcrumbList, Product, FAQPage, Article schema nodes.
-[ ] 4. Core Web Vitals
-      – LCP: preload hero image (<link rel="preload">), optimize TTFB (SSR/edge caching).
-      – INP: eliminate long tasks (>50ms) on main thread, defer non-critical JS.
-      – CLS: explicit width/height on all images and embeds; reserve space for dynamic widgets.
+1. Crawlability & Rendering
+   – Verify robots.txt does NOT block CSS/JS assets or crawlable catalog routes.
+   – Ensure HTTP 200 for valid pages, HTTP 404/410 for deleted content, 301 for canonical redirects.
+   – Check initial raw HTML response: critical content, H1, meta tags, and JSON-LD must be present.
+
+2. On-Page & Semantic Linting
+   – node .agent/skills/optimizing-seo-web/scripts/seo-audit-linter.mjs --path resources/
+   – Verify single H1, heading cascade, alt tags, canonical URLs, and OpenGraph dimensions.
+
+3. Structured Data Validation
+   – Validate server-rendered JSON-LD using Google Rich Results Test / Schema Validator.
+   – Verify BreadcrumbList, Product, and WebSite schemas adhere strictly to Schema.org standards.
 ```
 
 ---
 
-## 4. Reference Files
+## 5. Reference Files
 
-- **SEO Linter Script**: [seo-audit-linter.mjs](./scripts/seo-audit-linter.mjs) — inspects HTML for headings, alt tags, canonicals, meta descriptions.
-- **JSON-LD Schema Helpers**: [json-ld-schemas.ts](./examples/json-ld-schemas.ts) — TypeScript builders for valid Schema.org structures.
-- **Robots & Sitemap Generator**: [robots-and-sitemap-generator.js](./examples/robots-and-sitemap-generator.js) — zero-dependency Node.js script.
-- **SEO Architecture Guide**: [technical-seo-architecture.md](./references/technical-seo-architecture.md) — Googlebot rendering, crawl budget, Core Web Vitals deep-dive.
-- **SEO Checklist**: [technical-seo-checklist.md](./resources/technical-seo-checklist.md) — CWV thresholds, HTTP status codes, `hreflang` implementation.
+- **SEO Linter Script**: [seo-audit-linter.mjs](./scripts/seo-audit-linter.mjs) — inspects HTML, Vue, and Blade templates for headings, alt tags, canonicals, and meta tags.
+- **JSON-LD Schema Helpers (SPA/Client)**: [json-ld-schemas.ts](./examples/json-ld-schemas.ts) — TypeScript builders for Schema.org structures (Archetype B).
+- **Robots & Sitemap Generator**: [robots-and-sitemap-generator.js](./examples/robots-and-sitemap-generator.js) — zero-dependency sitemap and robots.txt generator.
+- **SEO Architecture Guide**: [technical-seo-architecture.md](./references/technical-seo-architecture.md) — Googlebot rendering, crawl budget, and CWV deep-dive.
+- **SEO Checklist**: [technical-seo-checklist.md](./resources/technical-seo-checklist.md) — actionable audit matrix and Core Web Vitals benchmarks.
+

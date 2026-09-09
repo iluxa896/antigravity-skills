@@ -18,14 +18,12 @@ This reference document provides production-grade security guidelines, performan
 - **ORM Safe Practices**:
   - **Laravel Eloquent**: Use `where('status', $status)` or `whereRaw('status = ?', [$status])`. Avoid passing raw unquoted strings into `orderByRaw` or `whereRaw`.
   - **Doctrine ORM**: Use `$qb->where('u.status = :status')->setParameter('status', $status)`.
-  - **Phalcon PHQL**: Pass `$this->modelsManager->createQuery("SELECT * FROM App\Models\Users WHERE status = :status:")->execute(['status' => $status])`.
 
 ### B. Cross-Site Scripting (XSS) Prevention
 - **Rule**: Escape all user-controlled data before rendering into HTML/DOM templates.
 - **Templating Escaping Rules**:
   - **Blade**: Standard tags `{{ $var }}` run `e()` (htmlspecialchars). Use `{!! $var !!}` ONLY for pre-sanitized HTML.
   - **Twig**: Twig auto-escapes `{{ var }}`. Use `|raw` filter strictly with HTML Purifier output.
-  - **Volt**: Auto-escapes `{{ var }}` by default.
   - **Raw PHP Output**:
     ```php
     echo htmlspecialchars($userInput, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -35,9 +33,9 @@ This reference document provides production-grade security guidelines, performan
 - **SameSite Cookies**: Set `SameSite=Lax` or `SameSite=Strict` on session and authentication cookies.
 - **Cookie Security Flags**: Enforce `HttpOnly; Secure; SameSite=Lax`.
 - **Framework Middleware**:
-  - Laravel: Enable `VerifyCsrfToken` middleware on web routes.
+  - Laravel: Enable `VerifyCsrfToken` middleware on web routes and `X-XSRF-TOKEN` header on Inertia/Axios requests.
   - Symfony: Use `csrf_protection: true` in framework settings and check `isCsrfTokenValid()`.
-  - Phalcon: Use `$this->security->getToken()` and `$this->security->checkToken()` on form submissions.
+
 
 ### D. Secure Authentication & Password Hashing
 - **Algorithm**: Always use modern password hashing algorithms (`Argon2id` or `Bcrypt` with high cost).

@@ -1,270 +1,193 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\Api;
 
-use PHPUnit\Framework\TestCase;
-use RuntimeException;
-use InvalidArgumentException;
+use Tests\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\User;
+use App\Models\Card;
 
 /**
- * Enterprise PHPUnit API Destructive Test Suite
+ * Enterprise PHPUnit API Destructive Feature Test Suite
  *
- * Demonstrates destructive API testing patterns: boundary analysis, negative input fuzzing,
- * idempotency token replay attacks, database transaction rollback validation, and
- * graceful degradation under upstream failure.
+ * Demonstrates senior-level destructive API testing patterns:
+ * 1. Happy Path: Valid payload with idempotency verification and database persistence.
+ * 2. Concurrency & Idempotency: Replaying duplicate requests with the same token must not create duplicates.
+ * 3. Boundary Value Analysis (BVA): Negative numbers, zero limits, string length overflow, and fuzzing.
+ * 4. Security Injections: XSS and SQL injection payloads handled safely without 500 server errors.
+ * 5. Atomic Integrity: Exception mid-flow must cleanly roll back all database transactions.
  */
 final class OrderApiDestructiveTest extends TestCase
 {
-    private MockDatabaseConnection $db;
-    private OrderProcessingService $orderService;
+    use RefreshDatabase;
+
+    private User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->db = new MockDatabaseConnection();
-        $this->orderService = new OrderProcessingService($this->db);
+        $this->user = User::factory()->create();
     }
 
     /**
      * @test
-     * Happy Path: Valid payload with proper idempotency key produces successful persisted order.
+     * Happy Path: Valid order payload creates a confirmed order and persists line items atomically.
      */
-    public function testSuccessfulOrderPlacementWithIdempotency(): void
+    public function test_successful_order_placement_with_idempotency(): void
     {
-        $idempotencyKey = 'idem_key_' . bin2hex(random_bytes(16));
+        $card = Card::factory()->create(['price' => 1500, 'is_published' => true]);
+        $idempotencyKey = 'idem_' . bin2hex(random_bytes(16));
+
         $payload = [
-            'customer_id' => 1042,
             'items' => [
-                ['sku' => 'SKU-CARD-001', 'quantity' => 2, 'unit_price' => 1500],
+                ['card_id' => $card->id, 'quantity' => 2],
             ],
-            'currency' => 'EUR',
+            'shipping_address' => 'г. Москва, ул. Арбат, д. 10',
         ];
 
-        $order = $this->orderService->processOrder($idempotencyKey, $payload);
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Idempotency-Key', $idempotencyKey)
+            ->postJson('/api/v1/orders', $payload);
 
-        $this->assertSame('CONFIRMED', $order['status']);
-        $this->assertSame(3000, $order['total_amount']);
-        $this->assertTrue($this->db->isCommitted());
+        $response->assertStatus(201)
+            ->assertJsonPath('data.status', 'CONFIRMED')
+            ->assertJsonPath('data.total_amount', 3000);
+
+        $this->assertDatabaseHas('orders', [
+            'user_id' => $this->user->id,
+            'total_amount' => 3000,
+            'status' => 'CONFIRMED',
+        ]);
     }
 
     /**
      * @test
-     * Destructive: Duplicate submission with the same idempotency key must not duplicate charges.
+     * Concurrency & Idempotency: Immediate re-submission with identical token must replay cached response without duplicate records.
      */
-    public function testDuplicateIdempotencyKeyReturnsCachedOrderWithoutDoubleCharging(): void
+    public function test_duplicate_idempotency_key_prevents_duplicate_charge_and_mutation(): void
     {
-        $idempotencyKey = 'idem_unique_replay_token_991';
+        $card = Card::factory()->create(['price' => 2500, 'is_published' => true]);
+        $idempotencyKey = 'idem_replay_test_' . bin2hex(random_bytes(8));
+
         $payload = [
-            'customer_id' => 1042,
             'items' => [
-                ['sku' => 'SKU-CARD-001', 'quantity' => 1, 'unit_price' => 2500],
+                ['card_id' => $card->id, 'quantity' => 1],
             ],
-            'currency' => 'USD',
+            'shipping_address' => 'г. Санкт-Петербург, Невский пр-т, д. 1',
         ];
 
-        // First call
-        $firstOrder = $this->orderService->processOrder($idempotencyKey, $payload);
+        // First submission
+        $firstResponse = $this->actingAs($this->user)
+            ->withHeader('X-Idempotency-Key', $idempotencyKey)
+            ->postJson('/api/v1/orders', $payload);
 
-        // Immediate replay with same idempotency key
-        $secondOrder = $this->orderService->processOrder($idempotencyKey, $payload);
+        $firstResponse->assertStatus(201);
+        $orderId = $firstResponse->json('data.id');
 
-        $this->assertSame($firstOrder['order_id'], $secondOrder['order_id']);
-        $this->assertSame(1, $this->db->getTransactionCount(), 'Expected exactly one transaction execution');
+        // Immediate duplicate replay
+        $secondResponse = $this->actingAs($this->user)
+            ->withHeader('X-Idempotency-Key', $idempotencyKey)
+            ->postJson('/api/v1/orders', $payload);
+
+        $secondResponse->assertStatus(200);
+        $this->assertSame($orderId, $secondResponse->json('data.id'));
+
+        // Assert database contains exactly ONE order record
+        $this->assertDatabaseCount('orders', 1);
     }
 
     /**
      * @test
-     * Boundary & Negative: Extreme integer overflows, negative quantities, and zero unit prices.
+     * Boundary Value Analysis (BVA): Zero quantity, negative numbers, and empty arrays are rejected with 422.
      *
      * @dataProvider invalidPayloadBoundaryDataProvider
      */
-    public function testBoundaryAndMalformedPayloadsTriggerExplicitValidationExceptions(array $malformedPayload, string $expectedExceptionMessage): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage($expectedExceptionMessage);
+    public function test_boundary_and_malformed_payloads_return_deterministic_validation_errors(
+        array $invalidPayload,
+        string $expectedErrorField
+    ): void {
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/v1/orders', $invalidPayload);
 
-        $idempotencyKey = 'idem_key_' . bin2hex(random_bytes(8));
-        $this->orderService->processOrder($idempotencyKey, $malformedPayload);
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors($expectedErrorField);
     }
 
     public static function invalidPayloadBoundaryDataProvider(): array
     {
         return [
             'negative quantity' => [
-                ['customer_id' => 101, 'items' => [['sku' => 'SKU-1', 'quantity' => -5, 'unit_price' => 100]], 'currency' => 'USD'],
-                'Quantity must be greater than zero',
+                ['items' => [['card_id' => 1, 'quantity' => -5]], 'shipping_address' => 'Valid Address'],
+                'items.0.quantity',
             ],
             'zero quantity' => [
-                ['customer_id' => 101, 'items' => [['sku' => 'SKU-1', 'quantity' => 0, 'unit_price' => 100]], 'currency' => 'USD'],
-                'Quantity must be greater than zero',
+                ['items' => [['card_id' => 1, 'quantity' => 0]], 'shipping_address' => 'Valid Address'],
+                'items.0.quantity',
             ],
             'empty items array' => [
-                ['customer_id' => 101, 'items' => [], 'currency' => 'USD'],
-                'Order must contain at least one item',
+                ['items' => [], 'shipping_address' => 'Valid Address'],
+                'items',
             ],
-            'integer overflow quantity' => [
-                ['customer_id' => 101, 'items' => [['sku' => 'SKU-1', 'quantity' => PHP_INT_MAX, 'unit_price' => 1000]], 'currency' => 'USD'],
-                'Total order amount exceeds permissible limit',
+            'missing shipping address' => [
+                ['items' => [['card_id' => 1, 'quantity' => 1]], 'shipping_address' => ''],
+                'shipping_address',
             ],
-            'unsupported currency code' => [
-                ['customer_id' => 101, 'items' => [['sku' => 'SKU-1', 'quantity' => 1, 'unit_price' => 100]], 'currency' => 'XYZ'],
-                'Invalid ISO-4217 currency',
+            'excessive shipping address length' => [
+                ['items' => [['card_id' => 1, 'quantity' => 1]], 'shipping_address' => str_repeat('A', 2001)],
+                'shipping_address',
             ],
         ];
     }
 
     /**
      * @test
-     * Destructive: Simulated database deadlock during checkout triggers transaction rollback and returns 500 equivalent.
+     * Security Defense: Malicious payloads (XSS, SQLi) in text fields are safely escaped and never trigger 500 errors.
      */
-    public function testDatabaseDeadlockRollsBackTransactionCleanly(): void
+    public function test_security_injection_payloads_do_not_cause_unhandled_exceptions(): void
     {
-        $this->db->simulateDeadlockOnNextWrite();
+        $card = Card::factory()->create(['price' => 1000, 'is_published' => true]);
+        $xssAddress = '<script>alert("XSS")</script><img src=x onerror=alert(1)>';
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Deadlock detected during transaction execution');
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/v1/orders', [
+                'items' => [['card_id' => $card->id, 'quantity' => 1]],
+                'shipping_address' => $xssAddress,
+            ]);
 
-        $idempotencyKey = 'idem_key_' . bin2hex(random_bytes(8));
-        $payload = [
-            'customer_id' => 500,
-            'items' => [['sku' => 'SKU-DEADLOCK', 'quantity' => 1, 'unit_price' => 5000]],
-            'currency' => 'EUR',
-        ];
+        // Must either successfully create (with stripped/escaped input) or reject with 422, NEVER 500
+        $this->assertNotSame(500, $response->status());
 
-        try {
-            $this->orderService->processOrder($idempotencyKey, $payload);
-        } finally {
-            $this->assertTrue($this->db->isRolledBack(), 'Database transaction must be rolled back on error');
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Production Supporting Services & Mocks for Isolated Testing
-// -----------------------------------------------------------------------------
-
-final class OrderProcessingService
-{
-    private array $idempotencyCache = [];
-
-    public function __construct(private MockDatabaseConnection $db)
-    {
-    }
-
-    public function processOrder(string $idempotencyKey, array $payload): array
-    {
-        if (isset($this->idempotencyCache[$idempotencyKey])) {
-            return $this->idempotencyCache[$idempotencyKey];
-        }
-
-        $this->validatePayload($payload);
-
-        $this->db->beginTransaction();
-
-        try {
-            $totalAmount = 0;
-            foreach ($payload['items'] as $item) {
-                $subtotal = $item['quantity'] * $item['unit_price'];
-                if ($subtotal < 0 || $subtotal > 100_000_000) {
-                    throw new InvalidArgumentException('Total order amount exceeds permissible limit');
-                }
-                $totalAmount += $subtotal;
-            }
-
-            $orderId = 'ORD-' . strtoupper(bin2hex(random_bytes(6)));
-            $orderRecord = [
-                'order_id' => $orderId,
-                'status' => 'CONFIRMED',
-                'customer_id' => $payload['customer_id'],
-                'total_amount' => $totalAmount,
-                'currency' => $payload['currency'],
-            ];
-
-            $this->db->insert('orders', $orderRecord);
-            $this->db->commit();
-
-            $this->idempotencyCache[$idempotencyKey] = $orderRecord;
-
-            return $orderRecord;
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
+        if ($response->status() === 201) {
+            // Assert stored address does not contain unescaped executable script tags
+            $savedOrder = \App\Models\Order::latest('id')->first();
+            $this->assertStringNotContainsString('<script>', $savedOrder->shipping_address);
         }
     }
 
-    private function validatePayload(array $payload): void
+    /**
+     * @test
+     * Atomic Integrity: If an unexpected failure occurs during order finalization, all database changes are rolled back.
+     */
+    public function test_transaction_rolls_back_cleanly_on_internal_service_exception(): void
     {
-        if (empty($payload['items'])) {
-            throw new InvalidArgumentException('Order must contain at least one item');
-        }
+        $card = Card::factory()->create(['price' => 1000, 'is_published' => true]);
 
-        if (!in_array($payload['currency'] ?? '', ['USD', 'EUR', 'GBP'], true)) {
-            throw new InvalidArgumentException('Invalid ISO-4217 currency');
-        }
+        // Simulate payment gateway failure during order processing
+        $this->mock(\App\Services\PaymentGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('charge')->andThrow(new \RuntimeException('Payment gateway timeout'));
+        });
 
-        foreach ($payload['items'] as $item) {
-            if (!isset($item['quantity']) || $item['quantity'] <= 0) {
-                throw new InvalidArgumentException('Quantity must be greater than zero');
-            }
-        }
-    }
-}
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/v1/orders', [
+                'items' => [['card_id' => $card->id, 'quantity' => 1]],
+                'shipping_address' => 'г. Москва, ул. Ленина, д. 5',
+            ]);
 
-final class MockDatabaseConnection
-{
-    private bool $inTransaction = false;
-    private bool $committed = false;
-    private bool $rolledBack = false;
-    private int $transactionCount = 0;
-    private bool $failWithDeadlock = false;
+        $response->assertStatus(502);
 
-    public function simulateDeadlockOnNextWrite(): void
-    {
-        $this->failWithDeadlock = true;
-    }
-
-    public function beginTransaction(): void
-    {
-        $this->inTransaction = true;
-        $this->committed = false;
-        $this->rolledBack = false;
-    }
-
-    public function insert(string $table, array $data): void
-    {
-        if ($this->failWithDeadlock) {
-            throw new RuntimeException('Deadlock detected during transaction execution');
-        }
-    }
-
-    public function commit(): void
-    {
-        if (!$this->inTransaction) {
-            throw new RuntimeException('Cannot commit without active transaction');
-        }
-        $this->inTransaction = false;
-        $this->committed = true;
-        $this->transactionCount++;
-    }
-
-    public function rollback(): void
-    {
-        $this->inTransaction = false;
-        $this->rolledBack = true;
-    }
-
-    public function isCommitted(): bool
-    {
-        return $this->committed;
-    }
-
-    public function isRolledBack(): bool
-    {
-        return $this->rolledBack;
-    }
-
-    public function getTransactionCount(): int
-    {
-        return $this->transactionCount;
+        // Verify that order was NOT persisted in the database (rolled back cleanly)
+        $this->assertDatabaseCount('orders', 0);
     }
 }

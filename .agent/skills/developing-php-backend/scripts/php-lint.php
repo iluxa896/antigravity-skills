@@ -21,14 +21,16 @@ Enterprise PHP Syntax & Linter Validator
 
 Usage:
   php php-lint.php [options] <file_or_directory>
+  docker compose exec -T app php php-lint.php <file_or_directory>
 
 Options:
   -h, --help    Display this help message and exit
 
 Checks performed:
-  ✔ Recursive discovery of all .php files
-  ✔ Parallel syntax compilation verification via php -l
+  ✔ Recursive discovery of all standalone .php files (skipping .blade.php)
+  ✔ Fast syntax compilation verification via native php -l
   ✔ Deterministic exit codes: 0 on success, 1 on compilation failure
+  💡 Note: Validate Blade templates via 'php artisan view:cache'
 
 HELP;
     exit(0);
@@ -60,9 +62,17 @@ if (is_dir($target)) {
     $iterator = new RecursiveIteratorIterator($directoryIterator);
     foreach ($iterator as $file) {
         if ($file->isFile() && strtolower($file->getExtension()) === 'php') {
-            // Skip vendor, .git, and cache directories
+            $filename = $file->getFilename();
+            // Skip Blade templates (validate via php artisan view:cache)
+            if (str_ends_with($filename, '.blade.php')) {
+                continue;
+            }
+            // Skip vendor, .git, storage, and cache directories
             $pathname = $file->getPathname();
-            if (str_contains($pathname, 'vendor') || str_contains($pathname, '.git') || str_contains($pathname, 'storage')) {
+            if (str_contains($pathname, 'vendor') ||
+                str_contains($pathname, '.git') ||
+                str_contains($pathname, 'storage') ||
+                str_contains($pathname, 'bootstrap' . DIRECTORY_SEPARATOR . 'cache')) {
                 continue;
             }
             $filesToLint[] = $pathname;
@@ -71,6 +81,7 @@ if (is_dir($target)) {
 } else {
     $filesToLint[] = $target;
 }
+
 
 if (empty($filesToLint)) {
     echo "No PHP files found to lint in target: {$target}\n";

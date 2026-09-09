@@ -1,6 +1,13 @@
 /**
  * Type-Safe Schema.org JSON-LD Structured Data Builder
  * Adheres to Google Rich Results guidelines and Schema.org specifications.
+ * 
+ * ARCHITECTURAL GUIDANCE:
+ * - Strictly for Archetype B (Standalone SPAs / SSG like Nuxt/Vite with client/SSR head management).
+ * - FORBIDDEN IN ARCHETYPE A (Inertia.js / Laravel Monoliths): Do NOT use client-side schema
+ *   builders in Vue pages. In Inertia monoliths, server-render JSON-LD schemas in `app.blade.php`
+ *   via backend services (e.g. `SeoSchemaBuilder.php`) to ensure 100% scraper and crawler delivery
+ *   without client bundle bloat or duplicate maintenance overhead.
  */
 
 export interface OrganizationSchemaProps {
