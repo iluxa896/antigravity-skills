@@ -1,7 +1,15 @@
 import { ref, computed, reactive, type Ref, type ComputedRef } from 'vue';
 
 /**
- * Enterprise Vue 3 Safe Form Validation Composable
+ * ============================================================================
+ * [ARCHETYPE B: STANDALONE VUE 3 SPA / LOCAL FORM VALIDATION]
+ *
+ * For Inertia.js applications (Archetype A):
+ * - Prefer native useForm() from '@inertiajs/vue3', which automatically binds to Laravel
+ *   validation errors, manages processing states, handles CSRF tokens, and manages resets.
+ *
+ * Use this composable for Standalone SPAs (Vite/Nuxt + REST API) or local client-only validation.
+ * ============================================================================
  *
  * Provides reactive, debounced, typesafe form validation with built-in XSS input sanitization
  * and accessible WAI-ARIA attribute helpers.

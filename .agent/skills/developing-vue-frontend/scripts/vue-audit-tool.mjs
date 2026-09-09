@@ -32,13 +32,14 @@ Usage:
 Options:
   -p, --path <path>       Target file or directory to scan (default: .)
   -s, --strict            Treat all warnings as errors
+  --ts                    Force TypeScript check (<script setup lang="ts">)
   -h, --help              Show this help message and exit
 
 Checks performed:
   ✔ Security: Unsanitized v-html directives (requires DOMPurify)
   ✔ Security: Sensitive auth tokens in localStorage/sessionStorage
   ✔ Security: Insecure href="javascript:" or src="javascript:" links
-  ✔ Contracts: Vue SFC scripts using TypeScript (<script setup lang="ts">)
+  ✔ Contracts: Vue SFC scripts using TypeScript (<script setup lang="ts">, active if tsconfig.json or --ts)
   ✔ Images missing alt attributes
   ✔ Buttons without text content or aria-label
   ✔ Custom button/card @keydown.enter missing @keydown.space.prevent
@@ -52,9 +53,11 @@ Checks performed:
 }
 
 function parseArgs(args) {
+    const hasTsConfig = fs.existsSync(path.join(process.cwd(), 'tsconfig.json'));
     const options = {
         targetPath: '.',
         strict: false,
+        checkTs: hasTsConfig,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -65,13 +68,15 @@ function parseArgs(args) {
             options.targetPath = args[++i];
         } else if (arg === '-s' || arg === '--strict') {
             options.strict = true;
+        } else if (arg === '--ts') {
+            options.checkTs = true;
         }
     }
 
     return options;
 }
 
-function auditVueFile(filePath) {
+function auditVueFile(filePath, options = {}) {
     const content = fs.readFileSync(filePath, 'utf8');
     const relPath = path.relative(process.cwd(), filePath);
     const issues = [];
@@ -108,8 +113,8 @@ function auditVueFile(filePath) {
         });
     }
 
-    // Check 4: script setup lang="ts"
-    if (/<script/i.test(content) && !/<script\s+setup\s+lang=['"]ts['"]/i.test(content)) {
+    // Check 4: script setup lang="ts" (only when project is TypeScript configured or --ts specified)
+    if (options.checkTs && /<script/i.test(content) && !/<script\s+setup\s+lang=['"]ts['"]/i.test(content)) {
         issues.push({
             file: relPath,
             severity: 'WARNING',
@@ -250,7 +255,7 @@ function run() {
 
     const allIssues = [];
     for (const file of files) {
-        allIssues.push(...auditVueFile(file));
+        allIssues.push(...auditVueFile(file, options));
     }
 
     if (allIssues.length === 0) {

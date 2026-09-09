@@ -9,131 +9,114 @@ description: >-
   designing layouts, or auditing frontend code.
 ---
 
-# Developing Cross-Platform, Accessible & Secure Vue 3 Applications (Master Skill)
+# Developing Accessible, Resilient & Secure Vue 3 Applications (Universal Master Skill)
 
 ## When to use this skill
 
-- Building or refactoring Vue 3 components, views, or layouts using `<script setup lang="ts">`.
-- Creating interactive UI primitives (dialogs, popovers, dropdowns, tooltips, selects) — **must use Radix Vue**.
-- Writing type-safe composables (`usePlatformAdaptation.ts`, `useSafeFormValidation.ts`) or Pinia setup stores.
+- Building or refactoring Vue 3 components, views, or layouts (Composition API, `<script setup>`).
+- Applicable to both **Inertia.js Monoliths** (Laravel/Rails + Vue) and **Standalone SPAs** (Vite/Nuxt + REST/GraphQL).
+- Creating accessible interactive primitives (dialogs, popovers, dropdowns, tooltips, tabs) using **Radix Vue**.
 - Engineering cross-platform resilience across **iOS / iPhone**, **Android**, **macOS**, and **Windows**.
 - Ensuring cross-browser compatibility across **Safari**, **Chrome**, **Firefox**, and **Edge**.
-- Hardening frontend code against DOM XSS, prototype pollution, token exfiltration, and open redirects.
-- Auditing Vue components via the automated CLI scanner (`scripts/vue-audit-tool.mjs`).
+- Hardening frontend code against DOM XSS, prototype pollution, and insecure link protocols.
+- Auditing Vue codebases via the CLI scanner (`scripts/vue-audit-tool.mjs`).
 
 ---
 
-## 1. Degrees of Freedom Model
+## 1. Architectural Archetypes (Inertia.js vs Standalone SPA)
 
-| Freedom Level | Area | Application & Constraints |
+Before designing state or auth workflows, explicitly identify the application archetype:
+
+| Architectural Aspect | Archetype A: Inertia.js Monolith | Archetype B: Standalone Vue 3 SPA |
 | :--- | :--- | :--- |
-| **High Freedom** | Visual UI/UX & Layout Aesthetics | Selecting color palettes, typography hierarchies, glassmorphic overlays, micro-interaction easing curves, ambient glow accents. |
-| **Medium Freedom** | Component Structure & State Architecture | Structuring Pinia stores, designing composable contracts, configuring dynamic chunking, and defining route transition animations. |
-| **Low Freedom** | Platform, Browser, Accessibility & Security | **Mandatory Radix Vue** for interactive primitives. Mandatory TypeScript (`lang="ts"`). `DOMPurify.sanitize()` on all `v-html`. Dynamic viewport (`100dvh`). iOS input `font-size >= 16px`. `touch-action: manipulation`. Zero sensitive tokens in `localStorage`. Cross-browser testing (Safari, Chrome, Firefox, Edge). Cross-platform testing (Windows, macOS, iOS, Android). |
+| **Routing & Navigation** | Inertia router (`router.get()`, `<Link>`). Server is the single source of truth for routes. | Vue Router (`useRouter()`, `<RouterLink>`) with client-side navigation guards. |
+| **Authentication & State** | Server-side sessions (HttpOnly cookies, CSRF protection). Shared props via `usePage().props.auth`. | Pinia setup stores. In-memory access tokens with silent HttpOnly refresh. |
+| **Forms & Mutations** | Inertia `useForm()` with automatic CSRF, error mapping, and validation binding. | Custom composable / VeeValidate with explicit DTO payloads and Axios/Fetch clients. |
+| **Anti-Pattern Warning** | **DO NOT** add Pinia auth stores, manual JWT interceptors, or Vue Router guards to an Inertia app. | **DO NOT** attempt to use Inertia form helpers or page props in a standalone SPA. |
 
 ---
 
-## 2. Core Engineering Pillars
+## 2. Core Senior Principles (KISS, YAGNI & Anti-Overengineering)
 
-### A. Clean Architecture & Strict TypeScript Contracts
-- **Strict Composition API**: Standardize exclusively on SFC with `<script setup lang="ts">`. Untyped JS modules are forbidden.
-- **Typed Prop & Emit Contracts**: Use `defineProps<{...}>()` and `defineEmits<{...}>()`. Never use loose untyped prop arrays.
-- **Domain Composables**: Extract all stateful business workflows into dedicated composables returning readonly state, typed handlers, and deterministic lifecycle disposal (`onScopeDispose`).
-- **Encapsulated Pinia Stores**: Use Setup Store syntax `defineStore('id', () => { ... })` with explicit TypeScript DTO interfaces. Keep short-lived access tokens strictly in RAM with silent rotation via HttpOnly cookies.
+### A. The "Toolkit, Not Checklist" Mandate
+- The examples (`examples/`), guides (`references/`), and composables provided in this skill are a **toolkit** for solving specific technical problems.
+- **NEVER** treat them as a mandatory compliance checklist to be blindly forced into working code.
+- Apply patterns from this skill **ONLY** when a concrete, demonstrated issue in the existing codebase requires them.
+- If code is already working, readable, secure, and predictable: **leave it alone**.
 
-### B. Mandatory Radix Vue for Interactive UI Primitives
+### B. Respect Browser & Platform Defaults
+- **Native CSS First**: Always prefer native CSS solutions (`overflow-x: auto`, `touch-pan-x`, `scroll-smooth`, `position: sticky`) over custom JavaScript recreations.
+- **Event Loop Integrity**: NEVER intercept or hijack pointer events over interactive elements.
+  > ⚠️ **CRITICAL TRAP — Pointer Capture on Buttons**:
+  > Never call `setPointerCapture` on a container that wraps clickable elements (`<button>`, `<a>`, `<input>`).
+  > Capturing the pointer reroutes `pointerup` away from child buttons, causing the browser to **swallow native click events**.
+  > Standard mouse dragging should only be applied where native CSS scrolling is insufficient, and must never disrupt click propagation.
+- **Virtual DOM Keys (`:key`)**:
+  - **Dynamic Mutable Lists**: When an array supports additions, deletions from arbitrary indexes, reordering, or contains internal input states (e.g. form specification rows), you **MUST** provide stable unique keys (`:key="item.id"` or local client `_uid`).
+  - **Static Read-Only Lists**: For static navigation or paginators (e.g. breadcrumbs, pagination links, fixed table headers), `:key="index"` is completely standard, optimal, and free of unnecessary string concatenation overhead (`${item.name}-${index}` is a cargo-cult anti-pattern).
 
-**All accessibility-critical interactive components MUST be built on [Radix Vue](https://www.radix-vue.com/) primitives.** Custom implementations of these components are forbidden — they invariably fail on edge-case keyboard navigation, screen reader announcements, and focus trapping.
+### C. Pragmatic Abstraction
+- Do not extract single-use, 3-line inline checks into multi-file abstraction layers unless reused across multiple distinct domains.
+- Do not add unrequested multi-tab communication channels (`BroadcastChannel`, `localStorage` timestamp sync) unless multi-tab synchronization is a specified business requirement.
 
-| UI Primitive | Radix Vue Component | Use Instead Of |
+---
+
+## 3. Radix Vue for Interactive UI Primitives
+
+All complex accessibility-critical UI primitives **MUST** be built on [Radix Vue](https://www.radix-vue.com/) primitives. Custom DOM hacks (`<Teleport>` with manual focus traps and `z-index` wars) invariably fail on keyboard navigation and screen readers.
+
+| UI Primitive | Radix Vue Component | Typical Usage |
 | :--- | :--- | :--- |
-| **Modal / Dialog** | `DialogRoot`, `DialogPortal`, `DialogOverlay`, `DialogContent` | Custom `<Teleport>` + `v-if` modal wrappers |
-| **Popover** | `PopoverRoot`, `PopoverTrigger`, `PopoverContent` | Custom `v-if` + `position: absolute` tooltips |
-| **Dropdown Menu** | `DropdownMenuRoot`, `DropdownMenuTrigger`, `DropdownMenuContent` | Custom `<ul>` with `@click.outside` |
-| **Select** | `SelectRoot`, `SelectTrigger`, `SelectContent`, `SelectItem` | Custom `<div>` dropdowns with `role="listbox"` |
-| **Tooltip** | `TooltipProvider`, `TooltipRoot`, `TooltipTrigger`, `TooltipContent` | `title` attributes or custom hover divs |
-| **Accordion** | `AccordionRoot`, `AccordionItem`, `AccordionTrigger`, `AccordionContent` | Custom `v-if` toggle sections |
-| **Tabs** | `TabsRoot`, `TabsList`, `TabsTrigger`, `TabsContent` | Custom `<button>` + `v-if` panel switching |
-| **Alert Dialog** | `AlertDialogRoot`, `AlertDialogAction`, `AlertDialogCancel` | `window.confirm()` or custom confirm modals |
+| **Modal / Dialog** | `DialogRoot`, `DialogPortal`, `DialogOverlay`, `DialogContent` | Product quick views, edit forms, confirmations |
+| **Popover** | `PopoverRoot`, `PopoverTrigger`, `PopoverContent` | Color pickers, contextual detail popups |
+| **Dropdown Menu** | `DropdownMenuRoot`, `DropdownMenuTrigger`, `DropdownMenuContent` | User profile menus, table action dropdowns |
+| **Select / Combobox** | `SelectRoot`, `SelectTrigger`, `SelectContent`, `SelectItem` | Custom stylized selects with keyboard navigation |
+| **Tooltip** | `TooltipProvider`, `TooltipRoot`, `TooltipTrigger`, `TooltipContent` | Accessible hover tooltips with delay control |
+| **Tabs** | `TabsRoot`, `TabsList`, `TabsTrigger`, `TabsContent` | Content tab switchers with ARIA keyboard selection |
+| **Checkbox** | `CheckboxRoot`, `CheckboxIndicator` | Accessible tri-state or customized checkboxes |
 
 #### Radix Vue Integration Rules:
-1. **Unstyled by default** — Radix Vue provides behavior and accessibility, you provide all CSS styling.
-2. **Composition pattern** — Use Radix Vue's slot-based composition, never override internal DOM structure.
-3. **Focus management** — Radix Vue handles focus trapping in dialogs, focus return on close, and arrow-key navigation in menus automatically. Do NOT manually manage focus for these primitives.
-4. **Animation** — Use Vue's `<Transition>` or CSS animations on Radix content components. Radix provides `data-state="open|closed"` attributes for animation hooks.
-5. **Portal rendering** — Use Radix's built-in portal components (`DialogPortal`, `PopoverPortal`) instead of raw `<Teleport to="body">`.
+1. **Unstyled-First**: Radix Vue provides state, focus trapping, and ARIA roles; you provide all styling via Tailwind or CSS.
+2. **Use `as-child` on Triggers**: Pass `as-child` to triggers (`<DialogTrigger as-child>`, `<DropdownMenuTrigger as-child>`) to attach Radix behaviors directly to your custom buttons without wrapping extra DOM nodes.
+3. **Automatic Focus Trapping**: Do not manually manage `tabindex` or call `element.focus()` inside Radix dialogs — Radix manages focus containment and restoration on close automatically.
+4. **Standard Buttons & Inputs**: Simple push buttons, standard form inputs, and regular navigation links do **NOT** require Radix; use standard semantic HTML `<button>`, `<input>`, `<a>`.
+5. **Reference Implementations**:
+   - See `examples/radix-dialog-example.vue` for a production-ready modal dialog with backdrop blur fallback, safe areas, and Android back sync.
+   - See `examples/radix-dropdown-example.vue` for an accessible user menu compatible with both Inertia and Vue Router.
 
-### C. Mandatory Cross-Platform Engineering (iOS, Android, macOS, Windows)
+---
 
-Every component and layout MUST be validated against all four target platforms. This is not optional.
+## 4. Cross-Platform & Cross-Browser Resilience
 
-| Platform | Core Challenge & Bug Risk | Mandatory Solution |
+Every user-facing interface must be resilient across all four major client environments:
+
+| Platform / Browser | Core Bug Risk | Senior Engineering Solution |
 | :--- | :--- | :--- |
-| **iPhone / iOS** (WebKit) | • Expanding Safari toolbars break `100vh`<br>• Notches & home indicators overlap buttons<br>• Input focus triggers disruptive auto-zoom<br>• Momentum scroll freezes on `overflow: hidden`<br>• Grey tap overlay boxes | • Use `100dvh` (with `100vh` fallback)<br>• Apply `env(safe-area-inset-*)` & `viewport-fit=cover`<br>• Enforce input `font-size: 16px`<br>• Rely on Radix Vue native scroll locking<br>• Add `-webkit-tap-highlight-color: transparent` |
-| **Android** (Blink / Chrome) | • 300ms double-tap gesture latency<br>• Hardware/gesture back exits app instead of closing modal<br>• Unwanted pull-to-refresh on dialog scroll<br>• Backdrop flex-sibling render flash (16–50ms) | • Apply `touch-action: manipulation`<br>• Use `useAndroidBackModalSync` via `popstate`<br>• Apply `overscroll-behavior-y: contain`<br>• Decouple backdrop & dialog into distinct fixed layers |
-| **macOS** (Safari / Chrome) | • Blurry font rendering on Retina<br>• Power-user shortcut confusion (Cmd vs Ctrl)<br>• Two-finger swipe triggers browser history | • Add `-webkit-font-smoothing: antialiased`<br>• Bind `event.metaKey` (⌘) vs `event.ctrlKey`<br>• Isolate slider touch actions (`touch-action: pan-y`) |
-| **Windows** (Edge / Chrome) | • Physical scrollbars cause layout shifts (CLS)<br>• Ugly default system scrollbars<br>• Unreadable UI in High Contrast Mode<br>• Touch-screen laptops trigger sticky hover bugs | • Enforce `scrollbar-gutter: stable` on root wrappers<br>• Custom sleek styling (`scrollbar-width: thin`)<br>• Support `@media (forced-colors: active)`<br>• Isolate hover via `@media (hover: hover) and (pointer: fine)` |
-
-### D. Mandatory Cross-Browser Compatibility
-
-**Target browser matrix** (minimum supported versions):
-
-| Browser | Engine | Min Version | Key Quirks to Guard Against |
-| :--- | :--- | :--- | :--- |
-| **Safari** | WebKit | 16+ | No `scrollbar-gutter`, `100dvh` support varies by minor version, `backdrop-filter` requires `-webkit-` prefix, `gap` in flexbox only from 14.1+ |
-| **Chrome** | Blink | 100+ | Stable baseline; watch for experimental CSS containment changes |
-| **Firefox** | Gecko | 115+ | `scrollbar-width: thin` supported; no `-webkit-backdrop-filter`; use standard `backdrop-filter` with `@supports` |
-| **Edge** | Blink | 100+ | Mirrors Chrome behavior; test Windows High Contrast Mode via Edge DevTools |
-
-#### Cross-Browser Rules:
-1. **`@supports` guards**: Always use `@supports (backdrop-filter: blur(1px))` for glassmorphic surfaces. Provide opaque fallback.
-2. **Vendor prefixes**: Apply `-webkit-backdrop-filter` alongside `backdrop-filter`. Apply `-webkit-font-smoothing` for Safari/Chrome.
-3. **Scrollbar strategy**: Use `scrollbar-width: thin` (Firefox standard) AND `::-webkit-scrollbar` (Chrome/Safari/Edge) for complete coverage.
-4. **CSS feature detection**: Never assume a CSS property exists. Use progressive enhancement with fallbacks.
-5. **Testing obligation**: Interactive components must be manually verified in Safari, Chrome, and Firefox before marking complete.
-
-### E. Security-by-Design & Robustness
-- **DOM XSS Defense**: Never pass unescaped user strings to `v-html`. Always use `DOMPurify.sanitize()`. Prefer text interpolation `{{ content }}`.
-- **Protocol Whitelisting**: Sanitize dynamic `:href` and `:src` bindings against `javascript:` and `data:` schemes.
-- **Defensive Number Coercion**: Never invoke `.toFixed()` on raw API values without explicit numeric casting (`Number(val ?? 0).toFixed(2)`).
-- **Division-by-Zero Defense**: Guard all percentages and ratios (`den <= 0 ? 0 : (num / den) * 100`).
+| **iOS / iPhone (WebKit)** | • Expanding address bar clips `100vh`<br>• Input focus triggers disruptive auto-zoom if font $< 16\text{px}$<br>• Grey tap overlay box on taps | • Use `100dvh` (with `100vh` fallback)<br>• Set `text-[16px] sm:text-xs/sm` on all inputs/selects/textareas<br>• Add `-webkit-tap-highlight-color: transparent` |
+| **Android (Blink)** | • 300ms double-tap delay on buttons<br>• Hardware/gesture back exits app instead of closing modal | • Apply `touch-action: manipulation` on buttons/links<br>• Sync open modal state with history (`popstate`) where appropriate |
+| **macOS (Safari / Chrome)**| • Trackpad 2-finger horizontal swipe triggers browser history navigation<br>• Fuzzy font rendering on HiDPI | • Set `touch-action: pan-y` on carousels/sliders<br>• Add `-webkit-font-smoothing: antialiased` |
+| **Windows (Edge / Firefox)**| • Layout shift (CLS) when vertical scrollbar appears<br>• High Contrast Mode accessibility | • Add `scrollbar-gutter: stable` on root scrollable wrappers<br>• Support `@media (forced-colors: active)` |
 
 ---
 
-## 3. Step-by-Step Workflow (Plan -> Contract -> Implement -> Audit)
+## 5. Frontend Security & Quality Safeguards
 
-```markdown
-- [ ] 1. Architecture & Typed Contracts
-      - Define TypeScript interfaces for props, emits, and domain DTO models.
-      - Ensure components use <script setup lang="ts"> and stores use typed Pinia.
-      - Identify which interactive primitives require Radix Vue (Dialog, Popover, Select, etc.).
-- [ ] 2. Radix Vue Primitive Integration
-      - Install radix-vue. Import required primitives.
-      - Compose Radix components with custom styling (unstyled-first approach).
-      - Verify focus trap, keyboard navigation, and screen reader announcements.
-- [ ] 3. Cross-Platform Layout & Styling
-      - Apply 100dvh, safe area insets (env(safe-area-inset-*)), and scrollbar-gutter: stable.
-      - Enforce font-size >= 16px on inputs and touch-action: manipulation on buttons.
-      - Isolate hover lifts behind @media (hover: hover) and (pointer: fine).
-      - Test on iOS Safari, Android Chrome, macOS Safari, Windows Edge.
-- [ ] 4. Cross-Browser Verification
-      - Verify @supports fallbacks for backdrop-filter and scrollbar styling.
-      - Test in Safari 16+, Chrome 100+, Firefox 115+, Edge 100+.
-- [ ] 5. Security Hardening & Zero-Trust Checks
-      - Verify all v-html uses DOMPurify; sanitize dynamic href links.
-      - Check numeric conversions and divide-by-zero guards.
-- [ ] 6. Automated Audit Verification
-      - Run Vue audit tool: node .agent/skills/developing-vue-frontend/scripts/vue-audit-tool.mjs --path src/ --strict
-```
+- **DOM XSS Defense**:
+  - Never render unescaped user-supplied markup via `v-html`. If HTML rendering is strictly required, sanitize with `DOMPurify.sanitize()`.
+  - Prefer standard Vue template interpolation `{{ text }}`.
+- **Link Protocol Sanitization**:
+  - When rendering external links with dynamic URLs from untrusted sources, verify protocol begins with `http://` or `https://` to prevent `javascript:` or `data:` URL execution.
+  - Always add `target="_blank" rel="noopener noreferrer"` on external links.
+- **Numeric Casting Safety**:
+  - Always guard against `NaN` and `TypeError` when invoking formatting: `Number(val ?? 0).toFixed(2)`.
+  - Guard division against zero: `total <= 0 ? 0 : (count / total) * 100`.
 
 ---
 
-## 4. Supporting Resources & Examples
+## 6. Verification Workflow
 
-- **Radix Vue Dialog Example**: [radix-dialog-example.vue](./examples/radix-dialog-example.vue) — Production dialog built on Radix Vue `DialogRoot` with native scroll lock, safe-area insets, Android back sync, and `@supports` backdrop-filter fallback.
-- **Platform Adaptation Composable**: [usePlatformAdaptation.ts](./examples/usePlatformAdaptation.ts) — TypeScript composable for OS detection, visual viewport tracking, shortcut formatting (⌘ vs Ctrl), and Android back-button modal sync.
-- **Safe Form Validation Composable**: [useSafeFormValidation.ts](./examples/useSafeFormValidation.ts) — Type-safe form validation with XSS sanitization and WAI-ARIA helpers.
-- **Secure Pinia Auth Store**: [secure-auth-store.ts](./examples/secure-auth-store.ts) — In-memory access token storage, HttpOnly silent refresh, and XSS isolation.
-- **Cross-Platform & Browser Guide**: [cross-platform-browser-guide.md](./references/cross-platform-browser-guide.md) — Deep architectural guide on iOS, Android, Mac, Windows viewport quirks and Safari/Chrome/Firefox/Edge compatibility matrices.
-- **Vue Security & Compatibility Checklist**: [vue-security-compat-checklist.md](./resources/vue-security-compat-checklist.md) — Actionable audit checklist covering DOM XSS, Radix Vue validation, cross-platform device matrix, and cross-browser compatibility checks.
-- **Vue Audit CLI Script**: [vue-audit-tool.mjs](./scripts/vue-audit-tool.mjs) — Node.js CLI auditor inspecting SFCs for XSS, raw 100vh, input zoom bugs, TypeScript usage, and missing Radix Vue primitives.
+1. **Static Audit**: Run `node .agent/skills/developing-vue-frontend/scripts/vue-audit-tool.mjs --path <dir>` (add `--ts` only if project uses TypeScript).
+2. **Production Bundle**: Test build compilation (`npm run build` or `docker compose exec -T app npm run build`).
+3. **Honest Interactive Verification**:
+   - Verify interactions using real user actions (physical clicks, typing).
+   - **NEVER** use programmatic JS shortcuts (`element.click()`, `dispatchEvent()`) to artificially pass an interaction test when a real user interaction fails.

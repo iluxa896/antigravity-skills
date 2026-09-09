@@ -9,9 +9,21 @@ export interface UserProfile {
 }
 
 /**
- * Enterprise Secure Auth Store for Vue 3 + Pinia
+ * ============================================================================
+ * [ARCHETYPE B: STANDALONE VUE 3 SPA ONLY]
+ * DO NOT USE IN INERTIA.JS MONOLITHS (Archetype A).
  *
- * Security Principles:
+ * For Inertia.js applications (Laravel/Rails + Vue):
+ * - Authentication is managed via server-side session cookies (HttpOnly, CSRF).
+ * - Current user and auth state are accessed directly via:
+ *     import { usePage } from '@inertiajs/vue3';
+ *     const user = computed(() => usePage().props.auth.user);
+ * - Never create Pinia auth stores or manual JWT refresh loops in Inertia apps.
+ *
+ * Use this Pinia store ONLY for Standalone SPAs (Vite/Nuxt + REST API).
+ * ============================================================================
+ *
+ * Security Principles (Standalone SPA):
  * 1. Keep Short-Lived Access Tokens in-memory (RAM only). Never persist access tokens in localStorage/sessionStorage
  *    where rogue 3rd-party scripts or XSS payloads can extract them.
  * 2. Rely on HTTP-Only, Secure, SameSite=Strict cookies for refresh tokens.

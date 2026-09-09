@@ -158,3 +158,61 @@ This architectural reference provides comprehensive device-specific quirks, brow
   }
 }
 ```
+
+---
+
+## 4. Pointer Events, Scrolling & Interaction Mechanics (Anti-Overengineering)
+
+### A. The "Pointer Capture vs Click Target" Trap
+
+```
+   ┌─────────────────────────────────────────────────────────────┐
+   │ Scroll Wrapper with setPointerCapture(e.pointerId)          │
+   │                                                             │
+   │   ┌───────────────────────┐     ┌───────────────────────┐   │
+   │   │ <button> Child A </button> │     │ <button> Child B </button> │   │
+   │   └───────────────────────┘     └───────────────────────┘   │
+   └─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+  User clicks Child A:
+  1. pointerdown fires on Child A, bubbles to Wrapper.
+  2. Wrapper calls setPointerCapture(e.pointerId).
+  3. User releases mouse (pointerup).
+  4. ⚠️ BUG: Browser directs pointerup to Wrapper (the capture target), NOT Child A!
+  5. Browser requires pointerdown AND pointerup on the same target to fire a "click".
+  6. Result: Child A NEVER receives a native click event. The button appears completely dead!
+```
+
+#### Senior Engineering Rules for Pointer Events:
+1. **Never call `setPointerCapture` over interactive children**: If a container contains clickable buttons, links, or form inputs, capturing the pointer breaks the browser's native synthetic click dispatching.
+2. **Native CSS Over JS Drag**: In 95% of cases, native CSS scrolling is superior:
+   ```css
+   .scroll-ribbon {
+     overflow-x: auto;
+     overflow-y: hidden;
+     touch-action: pan-x;
+     -webkit-overflow-scrolling: touch;
+     scrollbar-width: none; /* Hide default scrollbar if desired */
+   }
+   .scroll-ribbon::-webkit-scrollbar {
+     display: none;
+   }
+   ```
+   Native CSS scrolling is GPU-accelerated, respects mouse wheels, trackpad horizontal swipes, momentum touch scrolling, and NEVER interferes with child button clicks.
+3. **If Desktop Mouse Drag is Strictly Required**:
+   - Only trigger drag mode if cursor movement exceeds a threshold (e.g. `distance > 6px`).
+   - Listen to `mousemove` on `window` without pointer capture, or set `pointer-events: none` on children only while actively dragging.
+   - Suppress the subsequent click event on release ONLY if an actual drag distance occurred.
+
+---
+
+## 5. Virtual DOM List Rendering Keys (`:key`) Pragmatism
+
+Do not cargo-cult linter rules about keys. Understand Vue's diffing engine:
+
+| List Category | Example | Recommended Key | Anti-Pattern to Avoid |
+| :--- | :--- | :--- | :--- |
+| **Static Read-Only Lists** | Breadcrumbs, pagination bars, navigation tabs, static footer links | `:key="index"` or `:key="item.name"` | ❌ `${item.name}-${index}` (unnecessary string allocation and template pollution) |
+| **Dynamic Mutable Lists** | Modifiable form rows (specifications, tags), draggable lists, items with internal input state | `:key="item.id"` or client-generated `_uid` (`crypto.randomUUID()`) | ❌ `:key="index"` (causes Vue to reuse existing DOM nodes, detaching input state on deletion/reordering) |
+
