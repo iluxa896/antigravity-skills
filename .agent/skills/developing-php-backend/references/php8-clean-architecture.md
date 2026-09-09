@@ -28,12 +28,15 @@ final readonly class CreateOrderAction
         $dto = $request->toDto();
         $order = $this->orderService->createOrder($dto);
 
+        // For REST APIs (Archetype B): Return JsonResponse
+        // For Inertia Monoliths (Archetype A): Return RedirectResponse: to_route('orders.show', $order->id)->with('success', '...')
         return (new OrderResource($order))
             ->response()
             ->setStatusCode(201);
     }
 }
 ```
+
 
 ---
 
