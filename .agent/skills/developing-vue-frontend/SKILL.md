@@ -55,9 +55,11 @@ Before designing state or auth workflows, explicitly identify the application ar
   - **Dynamic Mutable Lists**: When an array supports additions, deletions from arbitrary indexes, reordering, or contains internal input states (e.g. form specification rows), you **MUST** provide stable unique keys (`:key="item.id"` or local client `_uid`).
   - **Static Read-Only Lists**: For static navigation or paginators (e.g. breadcrumbs, pagination links, fixed table headers), `:key="index"` is completely standard, optimal, and free of unnecessary string concatenation overhead (`${item.name}-${index}` is a cargo-cult anti-pattern).
 
-### C. Pragmatic Abstraction
-- Do not extract single-use, 3-line inline checks into multi-file abstraction layers unless reused across multiple distinct domains.
-- Do not add unrequested multi-tab communication channels (`BroadcastChannel`, `localStorage` timestamp sync) unless multi-tab synchronization is a specified business requirement.
+### C. Pragmatic Abstraction & Separation of Concerns (Thin Components)
+- **Thin `<script setup>` (Controller Pattern)**: Treat the component script as a thin transport/presentation layer. Its sole responsibility is binding reactive state to the UI template and delegating user interactions.
+- **Composables as Domain Services**: Avoid accumulating complex branched logic, multi-step state mutations, or heavy form lifecycles directly inside the SFC. Encapsulate domain logic into dedicated composables (e.g. `use<Feature>Form.ts`) returning explicit reactive state and actions.
+- **Pragmatic Boundary (KISS & YAGNI)**: Single-use, straightforward state (trivial forms/dialogs under ~30–50 lines without complex branching) may stay co-located inside the SFC. Do not extract single-use, 3-line inline checks into multi-file abstraction layers unless reused across multiple distinct domains.
+- **Browser State Isolation**: Do not add unrequested multi-tab communication channels (`BroadcastChannel`, `localStorage` timestamp sync) unless multi-tab synchronization is a specified business requirement.
 
 ---
 
