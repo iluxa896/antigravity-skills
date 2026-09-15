@@ -82,7 +82,9 @@ All complex accessibility-critical UI primitives **MUST** be built on [Radix Vue
 4. **Standard Buttons & Inputs**: Simple push buttons, standard form inputs, and regular navigation links do **NOT** require Radix; use standard semantic HTML `<button>`, `<input>`, `<a>`.
 5. **Reference Implementations**:
    - See `examples/radix-dialog-example.vue` for a production-ready modal dialog with backdrop blur fallback, safe areas, and Android back sync.
-   - See `examples/radix-dropdown-example.vue` for an accessible user menu compatible with both Inertia and Vue Router.
+6. **Dialog Lifecycle, State Teardown & Transition Preservation**:
+   - **Do NOT** place an external `v-if` on the parent modal wrapper if children rely on `<Transition leave-active-class="...">` (Vue will instantly unmount the tree, truncating exit animations).
+   - Maintain the modal instance mounted via `:open="isOpen"`, and **purge form state defensively** (`form.reset()`, clearing file/array accumulators) via `watch(() => props.isOpen)` or `@update:open` on dismiss, guaranteeing both zero state retention and uninterrupted exit transitions.
 
 ---
 

@@ -39,6 +39,7 @@ description: >-
     – Search: innerHTML, dangerouslySetInnerHTML, v-html, eval(), document.write().
     – Check localStorage/sessionStorage for sensitive data or JWTs.
     – Verify CORS headers and Content-Security-Policy (no unsafe-inline, unsafe-eval).
+    – Client state & payload pollution: verify dialogs/modals teardown state on dismiss to prevent ghost data leakage into payloads.
 [ ] Phase 3: Backend & API Audit
     – Parameterized queries on every DB call (SQLi / NoSQLi).
     – Input validation and strict type safety at all API boundaries.

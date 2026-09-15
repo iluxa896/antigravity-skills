@@ -58,6 +58,7 @@ Apply to all mission-critical workflows (orders, payments, sensitive data mutati
 | **Security Injections** | XSS payloads (`<img src=x onerror=...`), SQLi (`' OR 1=1`) | Stripped, escaped, or rejected; parameterized queries ensure zero injection. |
 | **Idempotency & Concurrency**| Double-click submissions, duplicate request tokens | First request succeeds; duplicate request safely replays or rejects without double mutation. |
 | **Database Failure** | Deadlock simulation, mid-mutation exception | Atomic `DB::transaction()` automatically rolls back all partial mutations. |
+| **UI Lifecycle & Ghost State** | Modal open -> mutate/append -> dismiss (Esc/overlay) -> re-open | Clean initial state. Zero stale data or array accumulation from uncommitted prior sessions; payload matches visible UI. |
 
 ---
 
