@@ -132,3 +132,79 @@ A senior software engineer avoids layer proliferation and cargo-cult abstraction
 ### Command Side (Writes / Mutations)
 - **Full Domain Protection**: User input is untrusted. Use `FormRequest` for validation, map to a typed DTO (`final readonly class`), and execute through an Action / Domain Service inside `DB::transaction()`.
 
+---
+
+## 6. Concurrency & Transactional Locking (Race Condition Defense)
+
+When mutating shared state (balances, ticket bookings, inventory counts, discount limits), wrapping statements in `DB::transaction()` is **necessary but insufficient** without explicit row locking. Without locks, concurrent requests execute read-then-write simultaneously, leading to balance overdraws or double bookings.
+
+### A. Pessimistic Locking (`lockForUpdate()`)
+Use pessimistic locking to block concurrent reads/writes on the affected rows until the transaction commits:
+
+```php
+return DB::transaction(static function () use ($dto): Order {
+    // 1. Acquire exclusive lock on the inventory row
+    $stock = StockItem::query()
+        ->where('product_id', $dto->productId)
+        ->lockForUpdate()
+        ->firstOrFail();
+
+    // 2. Validate invariant with fresh locked data
+    if ($stock->quantity < $dto->quantity) {
+        throw new InsufficientStockException('Requested quantity exceeds available stock.');
+    }
+
+    // 3. Atomically mutate
+    $stock->decrement('quantity', $dto->quantity);
+
+    return Order::create([...]);
+});
+```
+
+### B. Deadlock Prevention Strategy
+When locking multiple rows (e.g. transfers between accounts A and B), **always acquire locks in deterministic sorted order** (e.g., `min($id1, $id2)` then `max($id1, $id2)`). This prevents cyclic wait conditions where Request 1 locks A and waits for B, while Request 2 locks B and waits for A.
+
+---
+
+## 7. Queue & Event Transactional Safety (`afterCommit`)
+
+### The "Ghost Record" Antipattern
+A frequent junior backend error is dispatching events or queue jobs *inside* a database transaction without waiting for the commit:
+
+```php
+// ❌ DANGEROUS: Worker picks up job before the database transaction is committed!
+DB::transaction(function () use ($dto) {
+    $order = Order::create([...]);
+    SendOrderConfirmationJob::dispatch($order->id); // Worker runs immediately, gets ModelNotFoundException
+    sleep(1); // Simulating complex multi-step transaction
+});
+```
+
+### The Solution: `afterCommit` & `ShouldQueueAfterCommit`
+Ensure background jobs and events are only published after the transaction successfully commits:
+
+1. **Fluent Dispatch**: `SendOrderConfirmationJob::dispatch($order->id)->afterCommit();`
+2. **Job Property**: `$this->afterCommit = true;` in job constructor.
+3. **Event Listener**: Mark listeners with `implements ShouldQueueAfterCommit`.
+
+### Job Idempotency (`ShouldBeUnique`)
+Workers can fail and retry. To avoid duplicate side-effects (duplicate charges, spam emails), enforce idempotency:
+```php
+class ProcessPaymentJob implements ShouldQueue, ShouldBeUnique
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $uniqueFor = 3600; // Lock duration in seconds
+
+    public function __construct(public readonly string $paymentReference)
+    {
+        $this->afterCommit = true;
+    }
+
+    public function uniqueId(): string
+    {
+        return $this->paymentReference;
+    }
+}
+```
+

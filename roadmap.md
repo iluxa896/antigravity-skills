@@ -44,4 +44,12 @@
 - [x] Upgrade `scripts/vue-audit-tool.mjs` with Radix Vue primitive detection and cross-browser `-webkit-backdrop-filter` check
 - [x] Validate all skills with `validate-skills.mjs` (0 errors, 0 warnings)
 
+## Phase 18: Elevating PHP Backend Skill with Queues, Concurrency & Action Testing
+- [x] Elevate `developing-php-backend` with queue transactional safety (afterCommit), concurrency locks (lockForUpdate), and isolated Action test patterns
+- [x] Add `examples/laravel-action-queue-test.php` demonstrating transactional concurrency and testing
+- [x] Expand `references/php8-clean-architecture.md` and `resources/php-security-performance-checklist.md`
+- [x] Validate skill suite with `validate-skills.mjs`
+
+
+
 

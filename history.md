@@ -28,3 +28,9 @@
 - **Solution**: Removed sales/CRO templates and redundant manual scroll locks (`useBodyScrollLock.ts`) in favor of Radix Vue's native lock; mandated Radix Vue for all overlays/menus/dialogs; authored production `radix-dialog-example.vue`, `cross-platform-browser-guide.md`, and `vue-security-compat-checklist.md`; upgraded `vue-audit-tool.mjs` with Radix Vue and `-webkit-backdrop-filter` checks; updated `SKILL.md` frontmatter and degrees of freedom.
 - **Impacted Modules**: `.agent/skills/developing-vue-frontend/` (`SKILL.md`, `examples/`, `references/`, `resources/`, `scripts/`), `roadmap.md`, `history.md`. Validated 9/9 skills clean.
 
+## Milestone v8.0: PHP Backend Elevation (Queues, Concurrency & Action Testing)
+- **Problem**: Lack of explicit defenses against transaction race conditions (double spending / inventory overdraws), uncommitted queue reads (ghost records), and slow E2E-heavy testing.
+- **Solution**: Enforced `lockForUpdate()` in atomic `DB::transaction()` with deterministic sorted ordering; enforced `DB::afterCommit()` / `ShouldQueueAfterCommit` and `ShouldBeUnique` idempotency; authored complete zero-placeholder `examples/laravel-action-queue-test.php` with direct DTO invocation and `Queue::fake()`; updated `SKILL.md`, `references/php8-clean-architecture.md`, and `resources/php-security-performance-checklist.md`.
+- **Impacted Modules**: `.agent/skills/developing-php-backend/` (`SKILL.md`, `examples/laravel-action-queue-test.php`, `references/php8-clean-architecture.md`, `resources/php-security-performance-checklist.md`), `roadmap.md`, `history.md`. All 8 skills validated cleanly with `validate-skills.mjs`.
+
+

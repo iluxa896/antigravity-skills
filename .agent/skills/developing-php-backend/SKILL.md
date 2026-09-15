@@ -17,6 +17,8 @@ description: >-
 - Querying database layers with Eloquent ORM or Doctrine ORM.
 - Writing or securing templates: Blade or Twig.
 - Resolving N+1 bottlenecks, enforcing parameter binding, wrapping mutations in atomic transactions.
+- Preventing transaction race conditions (`lockForUpdate`) and unsafe queue dispatching (`afterCommit`).
+- Writing isolated Action tests with DTOs and queue/event faking (`Queue::fake()`).
 - Running syntax validation (`php-lint.php`), static analysis (Larastan/PHPStan), or test suites (PHPUnit/Pest).
 
 ---
@@ -54,11 +56,21 @@ A senior software engineer prevents **Layer Explosion / Cargo-Culting**. Do not 
 
 ### B. Commands (Mutations & Writes) — Strict Domain Safety
 - **Flow**: `FormRequest` (input validation) → `DTO` (sanitized domain payload) → `Action / DomainService` → `Redirect / Response`.
-- **Atomic Transactions**: All multi-step database mutations must be wrapped inside `DB::transaction()`:
+- **Atomic Transactions & Concurrency Locks**:
+  - All multi-step database mutations must be wrapped inside `DB::transaction()`.
+  - Shared balances, inventory counts, and booking slots MUST acquire exclusive row locks using `lockForUpdate()`.
+  - Deterministic lock ordering (`min($idA, $idB)` then `max($idA, $idB)`) prevents cyclic database deadlocks.
+- **Queue & Event Safety (`afterCommit`)**:
+  - NEVER dispatch background jobs or events before the database transaction commits.
+  - Enforce `SendNotificationJob::dispatch(...)->afterCommit();` or mark jobs with `$this->afterCommit = true;` to avoid race conditions with asynchronous workers.
+  - Enforce job idempotency via `ShouldBeUnique` to prevent duplicate execution on worker retries.
   ```php
   return DB::transaction(function () use ($dto): Card {
       $card = Card::create($dto->toArray());
       $card->syncRelations($dto->relationIds);
+
+      SendCardPublishedJob::dispatch($card->id)->afterCommit();
+
       return $card;
   });
   ```
@@ -97,14 +109,18 @@ Always execute PHP CLI commands inside the Docker container to avoid host enviro
       – Distinguish Inertia transport (Inertia::render, to_route) from REST API transport.
 [ ] 3. Type Safety & CQS Pragmatism
       – Native PHP 8.2+ types, readonly classes, BackedEnums with match.
+      – ZERO nested ternary operators: use declarative match () expressions or early returns.
       – Simple reads via Eloquent scopes; DTOs reserved for complex aggregations and writes.
-[ ] 4. Security & Data Integrity
+[ ] 4. Security, Concurrency & Data Integrity
       – All SQL parameters bound. Multi-step writes wrapped in DB::transaction().
+      – Counter/balance/inventory mutations protected via lockForUpdate().
+      – Background jobs and events dispatched via ->afterCommit() with ShouldBeUnique idempotency.
       – Eager-load relations (Card::with('category')) to eliminate N+1.
 [ ] 5. Automated Verification in Container
       – Syntax check: docker compose exec -T app php .agent/skills/developing-php-backend/scripts/php-lint.php app/
       – Template check: docker compose exec -T app php artisan view:cache
-      – Test suite: docker compose exec -T app php artisan test
+      – Test suite (Action & Unit): docker compose exec -T app php artisan test --filter=ActionTest
+      – Full suite: docker compose exec -T app php artisan test
 ```
 
 ---
@@ -128,6 +144,11 @@ Always execute PHP CLI commands inside the Docker container to avoid host enviro
 - **Streamlined Config**: Laravel 11 configures middleware and exceptions inside `bootstrap/app.php` (no `app/Http/Kernel.php`).
 - **Reference**: [laravel-controller-eloquent.php](./examples/laravel-controller-eloquent.php)
 
+### Action & Queue Testing Patterns
+- **Direct Action Testing**: Instantiate Action via DI container, pass typed DTO, assert DB state directly. Runs in <50ms without booting HTTP kernel or browser.
+- **Queue & Event Interception**: Intercept side-effects with `Queue::fake()`, `Event::fake()`, `Notification::fake()`.
+- **Reference**: [laravel-action-queue-test.php](./examples/laravel-action-queue-test.php)
+
 ### Symfony 6/7
 - DTOs with `#[Assert\NotBlank]` attributes. Service layer for persistence.
 - Doctrine `QueryBuilder` with `->setParameter()`. JOIN FETCH to prevent N+1.
@@ -139,5 +160,7 @@ Always execute PHP CLI commands inside the Docker container to avoid host enviro
 
 - **Syntax Linter**: [php-lint.php](./scripts/php-lint.php) — recursive PHP syntax validator with container execution instructions.
 - **Laravel & Inertia Patterns**: [laravel-controller-eloquent.php](./examples/laravel-controller-eloquent.php) — dual examples (Inertia Monolith vs REST API).
-- **Clean Architecture Guide**: [php8-clean-architecture.md](./references/php8-clean-architecture.md) — ADR pattern, typed DTOs, CQS guidelines.
-- **Security & Performance Checklist**: [php-security-performance-checklist.md](./resources/php-security-performance-checklist.md) — SQLi, XSS, CSRF, Argon2id, OPcache, N+1 audit.
+- **Action, Queue & Concurrency Patterns**: [laravel-action-queue-test.php](./examples/laravel-action-queue-test.php) — row locks (lockForUpdate), DB::afterCommit(), and isolated Action test suite.
+- **Clean Architecture Guide**: [php8-clean-architecture.md](./references/php8-clean-architecture.md) — ADR pattern, typed DTOs, CQS guidelines, concurrency locks, and afterCommit queue safety.
+- **Security & Performance Checklist**: [php-security-performance-checklist.md](./resources/php-security-performance-checklist.md) — SQLi, XSS, CSRF, Argon2id, OPcache, N+1, race conditions, and queue safety audit.
+

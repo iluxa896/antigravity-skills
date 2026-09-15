@@ -116,5 +116,9 @@ Copy and use this checklist during PHP PR code reviews:
 - [ ] **SQL Injection**: All dynamic queries use parameter binding or standard ORM builders.
 - [ ] **XSS Escaping**: User data in Blade/Twig/Volt templates is properly escaped.
 - [ ] **N+1 Queries**: Relational queries in list endpoints use eager loading.
+- [ ] **Concurrency & Race Conditions**: Shared counter, balance, and inventory mutations use `lockForUpdate()` within `DB::transaction()`.
+- [ ] **Queue Transactional Safety**: Jobs/events dispatched within transactions specify `->afterCommit()` or implement `ShouldQueueAfterCommit`.
+- [ ] **Job Idempotency**: Asynchronous jobs with side-effects implement `ShouldBeUnique` or verify idempotency tokens.
 - [ ] **Exception Handling**: Domain exceptions are caught and sanitized before outputting to API responses.
 - [ ] **Syntax Verification**: Passed `php -l` linting without errors.
+
